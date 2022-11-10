@@ -54,7 +54,9 @@ class Annotate:
         return main_explaination, additional_info
 
     def print_plan_plain(self, node_dict):
+        total_cost = 0
         for i in node_dict:
+            total_cost += node_dict[i][0]['Total Cost']
             if i == 0:
                 node = node_dict[i][0]
                 print(f"{node['Node Type']}")
@@ -66,6 +68,7 @@ class Annotate:
                     print("└── ", f"{node['Node Type']}")
                 else:
                     # More than 1 plans
+                    #  if one of these nodes also have 'More than 1 plans', then not sure if display will be okay?
                     for j in range(0, i):
                         print("\t", end='')
                     node = node_dict[i][0]
@@ -76,8 +79,8 @@ class Annotate:
                     node = node_dict[i][1]
                     print("└── ", f"{node['Node Type']}")
 
-        print(f"Total Cost: {node_dict[i][0]['Total Cost']}")
-        print(f"Total Time: {node_dict[i][0]['Actual Total Time']}")
+        print(f"Total Cost: {total_cost}")
+        print(f"Total Time: {node_dict[0][0]['Actual Total Time']}")
 
     def print_plan_with_annotation(self, node_dict):
         for i in node_dict:

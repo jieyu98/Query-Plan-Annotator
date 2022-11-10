@@ -12,9 +12,9 @@ class Connection:
 
     def begin_connection(self):
         return connect(
-            dbname="TPC-H",
-            user="jy",
-            password="password",
+            dbname="CZ4031Project",
+            user="postgres",
+            password="ashwin",
             port="5432",
             host="localhost",
         )
@@ -41,9 +41,11 @@ class Connection:
         return query_plan
 
     def get_aqp1(self, query):
+        # self.cursor.execute('SET enable_hashjoin = off;')
         query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query),
                                         DEFAULT_SEQ_PAGE_COST + 5, DEFAULT_RAND_PAGE_COST + 5)
         query_plan = query_plan[0][0][0]['Plan']
+        # self.cursor.execute('SET enable_hashjoin = on;') # reset
         return query_plan
 
     def get_aqp2(self, query):
@@ -51,6 +53,9 @@ class Connection:
                                         DEFAULT_SEQ_PAGE_COST + 10, DEFAULT_RAND_PAGE_COST + 10)
         query_plan = query_plan[0][0][0]['Plan']
         return query_plan
+
+
+
 
     def process_plan(self, plan):
         temp = {}
