@@ -110,57 +110,6 @@ class Annotate:
     #      text += f"QEP uses Nested Loop on relation {node['Relation Name']} while AQP uses Hash Join on the relation {node2['Relation Name']} "
     #      text += "One of the operand has very few rows. Making nested loop more cost efficient compared to hash join."
 
-    def get_main_details(self, node):
-        if node['Node Type'] == 'Seq Scan' or \
-                node['Node Type'] == 'Index Scan':
-            return "(" + node['Relation Name'] + ")"
-
-        if node['Node Type'] == 'Hash Join':
-            return node['Hash Cond']
-
-        if node['Node Type'] == 'Merge Join':
-            return node['Merge Cond']
-
-        if node['Node Type'] == 'Nested Loop':
-            if 'Join Filter' in node:
-                return node['Join Filter']
-            # else
-            # look one level down to find a child with node type index scan
-            # get index cond
-            # if _pkey in child_name
-            #
-
-        return ""
-
-    def print_plan_plain(self, node_dict):
-        total_cost = 0
-        for i in node_dict:
-            total_cost += node_dict[i][0]['Total Cost']
-            if i == 0:
-                node = node_dict[i][0]
-                print(f"{node['Node Type']} {self.get_main_details(node)}")
-            else:
-                if len(node_dict[i]) == 1:
-                    node = node_dict[i][0]
-                    for j in range(0, i):
-                        print("\t", end='')
-                    print("└── ", f"{node['Node Type']} {self.get_main_details(node)}")
-                else:
-                    # More than 1 plans
-                    #  if one of these nodes also have 'More than 1 plans', then not sure if display will be okay?
-                    for j in range(0, i):
-                        print("\t", end='')
-                    node = node_dict[i][0]
-                    print("├── ", f"{node['Node Type']} {self.get_main_details(node)}")
-
-                    for j in range(0, i):
-                        print("\t", end='')
-                    node = node_dict[i][1]
-                    print("└── ", f"{node['Node Type']} {self.get_main_details(node)}")
-
-        print(f"Total Cost: {total_cost}")
-        print(f"Total Time: {node_dict[0][0]['Actual Total Time']}")
-
     def print_plan_with_annotation(self, node_dict):
         for i in node_dict:
             if i == 0:
@@ -193,6 +142,7 @@ class main():
     # print(qep_node_dict)
     # print(aqp1_node_dict)
     annotation = Annotate()
+    annotation.print_plan_plain(qep_node_dict)
     print("Note: run annotation2.py for now")
     # print(
     #     "                                                            QUERY PLAN STRUCTURE                                                            ")

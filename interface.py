@@ -1,5 +1,92 @@
-# The file interface.py contains the code for the GUI.
-# Design and implement a user-friendly graphical user interface (GUI) to visualize your results
-# You can imagine that through it you can choose the database schema (TPC-H in this case), specify the query in the
-# Query panel and upon execution of your algorithm the Query panel is updated with annotations. You may also selectively
-# visualize the corresponding QEP in another panel.
+import streamlit as st
+import preprocessing
+from contextlib import contextmanager, redirect_stdout
+from io import StringIO
+
+
+class Interface:
+    def print_query_plain(self, node_dict, output):
+        with self.st_capture(output.code):
+            total_cost = 0
+            for i in node_dict:
+                total_cost += node_dict[i][0]['Total Cost']
+                if i == 0:
+                    node = node_dict[i][0]
+                    print(f"{node['Node Type']} {self.get_main_details(node)}")
+                else:
+                    if len(node_dict[i]) == 1:
+                        node = node_dict[i][0]
+                        for j in range(0, i):
+                            print("\t", end='')
+                        print("└── ", f"{node['Node Type']} {self.get_main_details(node)}")
+                    else:
+                        # More than 1 plans
+                        for j in range(0, i):
+                            print("\t", end='')
+                        node = node_dict[i][0]
+                        print("├── ", f"{node['Node Type']} {self.get_main_details(node)}")
+
+                        for j in range(0, i):
+                            print("\t", end='')
+                        node = node_dict[i][1]
+                        print("└── ", f"{node['Node Type']} {self.get_main_details(node)}")
+
+            print(f"Total Cost: {total_cost}")
+            print(f"Total Time: {node_dict[0][0]['Actual Total Time']}")
+
+    def get_main_details(self, node):
+        if node['Node Type'] == 'Seq Scan' or \
+                node['Node Type'] == 'Index Scan':
+            return "(" + node['Relation Name'] + ")"
+
+        if node['Node Type'] == 'Hash Join':
+            return node['Hash Cond']
+
+        if node['Node Type'] == 'Merge Join':
+            return node['Merge Cond']
+
+        if node['Node Type'] == 'Nested Loop':
+            if 'Join Filter' in node:
+                return node['Join Filter']
+            # else
+            # look one level down to find a child with node type index scan
+            # get index cond
+            # if _pkey in child_name
+            #
+
+        return ""
+
+    @contextmanager
+    def st_capture(self, output_func):
+        with StringIO() as stdout, redirect_stdout(stdout):
+            old_write = stdout.write
+
+            def new_write(string):
+                ret = old_write(string)
+                output_func(stdout.getvalue())
+                return ret
+
+            stdout.write = new_write
+            yield
+
+class main():
+    st.header("Query Processing")
+
+    st.text_area("Type your SQL statement below")
+    st.button("Execute")
+
+    st.subheader("Structure of the query is as follows:")
+
+    #hard coded for now
+    qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main()
+
+    interface = Interface()
+
+    output = st.empty()
+
+    interface.print_query_plain(qep_node_dict, output)
+
+main()
+
+
+
