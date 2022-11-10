@@ -1,5 +1,6 @@
 import streamlit as st
 import preprocessing
+import time
 from contextlib import contextmanager, redirect_stdout
 from io import StringIO
 
@@ -73,18 +74,23 @@ class main():
     st.header("Query Processing")
 
     st.text_area("Type your SQL statement below")
-    st.button("Execute")
 
-    st.subheader("Structure of the query is as follows:")
+    if st.button("Execute"):
+        st.subheader("Structure of the query is as follows:")
 
-    #hard coded for now
-    qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main()
+        with st.spinner('Wait for it...'):
+            # hard coded for now
+            qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main()
 
-    interface = Interface()
+            interface = Interface()
 
-    output = st.empty()
+            output = st.empty()
 
-    interface.print_query_plain(qep_node_dict, output)
+            interface.print_query_plain(qep_node_dict, output)
+
+        st.success('Done!')  # Add reset button here instead maybe
+
+
 
 main()
 
