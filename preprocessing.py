@@ -12,9 +12,9 @@ class Connection:
 
     def begin_connection(self):
         return connect(
-            dbname="CZ4031Project",
-            user="postgres",
-            password="ashwin",
+            dbname="TPC-H",
+            user="jy",
+            password="password",
             port="5432",
             host="localhost",
         )
@@ -40,22 +40,26 @@ class Connection:
         query_plan = query_plan[0][0][0]['Plan']
         return query_plan
 
-    def get_aqp1(self, query):
-        # self.cursor.execute('SET enable_hashjoin = off;')
+    def get_aqp(self, query, disable_list):
+        if 'Hash Join' in disable_list:
+            self.cursor.execute('SET enable_hashjoin = off;')
+
+        if 'Merge Join' in disable_list:
+            self.cursor.execute('SET enable_mergejoin = off;')
+
+        if 'Nested Loop' in disable_list:
+            self.cursor.execute('SET enable_nestloop = off;')
+
         query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query),
-                                        DEFAULT_SEQ_PAGE_COST + 5, DEFAULT_RAND_PAGE_COST + 5)
+                                        DEFAULT_SEQ_PAGE_COST, DEFAULT_RAND_PAGE_COST)
         query_plan = query_plan[0][0][0]['Plan']
-        # self.cursor.execute('SET enable_hashjoin = on;') # reset
+
+        # Enable them back
+        self.cursor.execute('SET enable_nestloop = on;')
+        self.cursor.execute('SET enable_mergejoin = on;')
+        self.cursor.execute('SET enable_hashjoin = on;')
+
         return query_plan
-
-    def get_aqp2(self, query):
-        query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query),
-                                        DEFAULT_SEQ_PAGE_COST + 10, DEFAULT_RAND_PAGE_COST + 10)
-        query_plan = query_plan[0][0][0]['Plan']
-        return query_plan
-
-
-
 
     def process_plan(self, plan):
         temp = {}
@@ -87,6 +91,7 @@ def main():
     query_processor = Connection()
 
     test_query = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
+    # test_query = "SELECT n_name,sum(l_extendedprice * (1 - l_discount)) as revenue FROM customer,orders,lineitem,supplier,nation,region WHERE c_custkey = o_custkey AND l_orderkey = o_orderkey AND l_suppkey = s_suppkey AND c_nationkey = s_nationkey AND s_nationkey = n_nationkey AND n_regionkey = r_regionkey AND r_name = 'ASIA' AND o_orderdate >= date '1994-01-01' AND o_orderdate < date '1994-01-01' + interval '1' year GROUP BY n_name ORDER BY revenue desc;"
     # test_query = "SELECT l_orderkey, sum(l_extendedprice * (1 - l_discount)) as revenue, o_orderdate, o_shippriority " + \
     #              "FROM customer, orders, lineitem " + \
     #              "WHERE c_mktsegment = 'BUILDING' AND c_custkey = o_custkey AND l_orderkey = o_orderkey AND " \
@@ -101,9 +106,41 @@ def main():
     qep = query_processor.get_qep(test_query)
     query_processor.get_nodes(qep, 0, qep_node_dict)
 
-    aqp1 = query_processor.get_aqp1(test_query)
+    found = 0
+    for level in qep_node_dict:
+        for plan in qep_node_dict[level]:
+            # Check the node type if it is a join
+            if found == 0:
+                if plan['Node Type'] == 'Hash Join':
+                    disable_list = ['Hash Join']
+                    found = 1
+                elif plan['Node Type'] == 'Merge Join':
+                    disable_list = ['Merge Join']
+                    found = 1
+                elif plan['Node Type'] == 'Nested Loop':
+                    disable_list = ['Nested Loop']
+                    found = 1
+
+    print(f"AQP1 Disabled: {disable_list}")
+    aqp1 = query_processor.get_aqp(test_query, disable_list)
     query_processor.get_nodes(aqp1, 0, aqp1_node_dict)
 
-    aqp2 = query_processor.get_aqp2(test_query)
+    found = 0
+    for level1 in aqp1_node_dict:
+        for plan1 in aqp1_node_dict[level1]:
+            if found == 0:
+                if plan1['Node Type'] == 'Hash Join':
+                    disable_list.append('Hash Join')
+                    found = 1
+                elif plan1['Node Type'] == 'Merge Join':
+                    disable_list.append('Merge Join')
+                    found = 1
+                elif plan1['Node Type'] == 'Nested Loop':
+                    disable_list.append('Nested Loop')
+                    found = 1
+
+    print(f"AQP2 Disabled: {disable_list}")
+    aqp2 = query_processor.get_aqp(test_query, disable_list)
     query_processor.get_nodes(aqp2, 0, aqp2_node_dict)
+
     return qep_node_dict, aqp1_node_dict, aqp2_node_dict

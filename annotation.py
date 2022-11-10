@@ -53,31 +53,109 @@ class Annotate:
 
         return main_explaination, additional_info
 
+    # def node_diff_reasons(node_dict, node_dict2):
+    # for i in node_dict:
+    #   text = ""
+    #   node = node_dict[i][0]
+    #   node2 = node_dict2[i][0]
+    #
+    #   if node['Node Type'] == "Index Scan" and node2['Node Type'] == "Seq Scan":
+    #       text = f"Difference Reasoning: "
+    #       text += f"QEP uses Index Scan on relation {node['Relation Name']} while AQP uses Sequential Scan on relation {node2['Relation Name']} "
+    #       text += "Sequential Scan is used to scan over the entire table, which is less efficient as compared to Index Scan "
+    #
+    #   if node['Node Type'] == "Seq Scan" and node2['Node Type'] == "Index Scan":
+    #       text = f"Difference Reasoning: "
+    #       text += f"QEP uses Sequential Scan on relation {node['Relation Name']} while AQP uses Index Scan on relation {node2['Relation Name']} "
+    #       text += "Given the index scan's higher per row cost and the low selectivity of the scan predicate, sequential scan would be a better option to use compared to index scan due to lower cost"
+    #
+    #   if node['Node Type'] == "Index Scan" and node2['Node Type'] == "Bitmap Scan":
+    #       text = f"Difference Reasoning: "
+    #       text += f"QEP uses Index Scan on relation {node['Relation Name']} while AQP uses Bitmap Scan on relation {node2['Relation Name']} "
+    #       text += "Since the scan predicate, {node[Index Condition]}, has high selectivity, it is more preferrable to use Index Scan instead of Bitmap Scan"
+    #
+    #   if node['Node Type'] == "Bitmap Scan" and node2['Node Type'] == "Index Scan":
+    #       text = f"Difference Reasoning: "
+    #       text += f"QEP uses Bitmap Scan on relation {node['Relation Name']} while AQP uses Index Scan on relation {node2['Relation Name']} "
+    #       text += "Since the scan predicate, {node[Index Condition]}, has low selectivity,Bitmap scan is preferred to Index Scan"
+
+    #   if node['Node Type'] == "Merge Join" and node2['Node Type'] == "Nested Loop":
+    #       text = f"Difference Reasoning: "
+    #       text += f"QEP uses Nested Loop on relation {node['Relation Name']} while AQP uses Merge Join on the relation {node2['Relation Name']} "
+    #       text += "Since the relations to be joined are already sorted, Merge Join would be preferrable over Nested Loop"
+    #
+    #   if node['Node Type'] == "Nested Loop" and node2['Node Type'] == "Merge Join":
+    #      text = f"Difference Reasoning: "
+    #      text += f"QEP uses Merge Join on relation {node['Relation Name']} while AQP uses Nested Loop on the relation {node2['Relation Name']} "
+    #      text += "Since the outer loop relation is relatively small and all tuples with the same join attribute values cannot fit into memory, nested loop will be more cost efficient than merge join."
+    #
+    #   if node['Node Type'] == "Merge Join" and node2['Node Type'] == "Hash Join":
+    #      text = f"Difference Reasoning: "
+    #      text += f"QEP uses Merge Join on relation {node['Relation Name']} while AQP uses Hash Join on the relation {node2['Relation Name']} "
+    #      text += "Given that the hash table does not fit into the memory, hash join becomes slower and less preferrable compared to merge join."
+
+    #  if node['Node Type'] == "Hash Join" and node2['Node Type'] == "Merge Join":
+    #      text = f"Difference Reasoning: "
+    #      text += f"QEP uses Hash Join on relation {node['Relation Name']} while AQP uses Merge Join on the relation {node2['Relation Name']} "
+    #      text += "Hash table can fit into memory, thus reducing the hash join cost, making it more preferrable than the merge join."
+
+    #   if node['Node Type'] == "Hash Join" and node2['Node Type'] == "Nested Loop":
+    #      text = f"Difference Reasoning: "
+    #      text += f"QEP uses Hash Join on relation {node['Relation Name']} while AQP uses Nested Loop on the relation {node2['Relation Name']} "
+    #      text += "Hash table can fit into memory, reducing cost of hash join, thus making it better compared to nested loop."
+
+    #   if node['Node Type'] == "Nested Loop" and node2['Node Type'] == "Hash Join":
+    #      text = f"Difference Reasoning: "
+    #      text += f"QEP uses Nested Loop on relation {node['Relation Name']} while AQP uses Hash Join on the relation {node2['Relation Name']} "
+    #      text += "One of the operand has very few rows. Making nested loop more cost efficient compared to hash join."
+
+    def get_main_details(self, node):
+        if node['Node Type'] == 'Seq Scan' or \
+                node['Node Type'] == 'Index Scan':
+            return "(" + node['Relation Name'] + ")"
+
+        if node['Node Type'] == 'Hash Join':
+            return node['Hash Cond']
+
+        if node['Node Type'] == 'Merge Join':
+            return node['Merge Cond']
+
+        if node['Node Type'] == 'Nested Loop':
+            if 'Join Filter' in node:
+                return node['Join Filter']
+            # else
+            # look one level down to find a child with node type index scan
+            # get index cond
+            # if _pkey in child_name
+            #
+
+        return ""
+
     def print_plan_plain(self, node_dict):
         total_cost = 0
         for i in node_dict:
             total_cost += node_dict[i][0]['Total Cost']
             if i == 0:
                 node = node_dict[i][0]
-                print(f"{node['Node Type']}")
+                print(f"{node['Node Type']} {self.get_main_details(node)}")
             else:
                 if len(node_dict[i]) == 1:
                     node = node_dict[i][0]
                     for j in range(0, i):
                         print("\t", end='')
-                    print("└── ", f"{node['Node Type']}")
+                    print("└── ", f"{node['Node Type']} {self.get_main_details(node)}")
                 else:
                     # More than 1 plans
                     #  if one of these nodes also have 'More than 1 plans', then not sure if display will be okay?
                     for j in range(0, i):
                         print("\t", end='')
                     node = node_dict[i][0]
-                    print("├── ", f"{node['Node Type']}")
+                    print("├── ", f"{node['Node Type']} {self.get_main_details(node)}")
 
                     for j in range(0, i):
                         print("\t", end='')
                     node = node_dict[i][1]
-                    print("└── ", f"{node['Node Type']}")
+                    print("└── ", f"{node['Node Type']} {self.get_main_details(node)}")
 
         print(f"Total Cost: {total_cost}")
         print(f"Total Time: {node_dict[0][0]['Actual Total Time']}")
@@ -113,17 +191,20 @@ class main():
     qep_node_dict, aqp1_node_dict, aqp2_node_dict = main()
 
     annotation = Annotate()
-    print("                                                            QUERY PLAN STRUCTURE                                                            ")
-    print("--------------------------------------------------------------------------------------------------------------------------------------------")
-    annotation.print_plan_plain(qep_node_dict)
-    print("                                                                 QUERY PLAN                                                                 ")
-    print("--------------------------------------------------------------------------------------------------------------------------------------------")
-    annotation.print_plan_with_annotation(qep_node_dict)
-    print("                                                              AQP 1 STRUCTURE                                                               ")
-    print("--------------------------------------------------------------------------------------------------------------------------------------------")
-    annotation.print_plan_plain(aqp1_node_dict)
-    print("                                                              AQP 2 STRUCTURE                                                               ")
-    print("--------------------------------------------------------------------------------------------------------------------------------------------")
-    annotation.print_plan_plain(aqp2_node_dict)
+    print("Note: run annotation2.py for now")
+    # print(
+    #     "                                                            QUERY PLAN STRUCTURE                                                            ")
+    # print(
+    #     "--------------------------------------------------------------------------------------------------------------------------------------------")
+    # annotation.print_plan_plain(aqp2_node_dict)
+    # # print("                                                                 QUERY PLAN                                                                 ")
+    # # print("--------------------------------------------------------------------------------------------------------------------------------------------")
+    # # annotation.print_plan_with_annotation(qep_node_dict)
+    # print("                                                              AQP 1 STRUCTURE                                                               ")
+    # print("--------------------------------------------------------------------------------------------------------------------------------------------")
+    # annotation.print_plan_plain(aqp1_node_dict)
+    # print("                                                              AQP 2 STRUCTURE                                                               ")
+    # print("--------------------------------------------------------------------------------------------------------------------------------------------")
+    # annotation.print_plan_plain(aqp2_node_dict)
 
     
