@@ -1,5 +1,6 @@
 from preprocessing import main
 
+
 class Annotate:
     def get_annotation(self, node):
         main_explaination = "NIL"
@@ -39,10 +40,10 @@ class Annotate:
 
         if node['Node Type'] == 'Aggregate':
             main_explaination = "the results from this query plan are aggregated, due to the group-by function"
-            additional_info = f"The aggregation is done on the keys {node['Group Key']}"    
+            additional_info = f"The aggregation is done on the keys {node['Group Key']}"
 
         if node['Node Type'] == 'Nested Loop':
-            main_explaination = "Nested loop is used when the records to be looked for is small and the joined columns of the inner row source are uniquely indexed."
+            main_explaination = "Nested loop join is used when the records to be looked for is small and the joined columns of the inner row source are uniquely indexed."
 
         if node['Node Type'] == 'Index Only Scan':
             main_explaination = "Index scan will access data only through the index and not the table, reducing IO cost, this is used because there is no need to access table data, only index data, for the results"
@@ -176,7 +177,7 @@ class Annotate:
                     print("\t", end='')
                 print(f"     {additional_info}")
 
-                if(len(node_dict[i]) > 1):
+                if (len(node_dict[i]) > 1):
                     for j in range(0, i):
                         print("\t", end='')
                     node = node_dict[i][1]
@@ -189,7 +190,8 @@ class Annotate:
 
 class main():
     qep_node_dict, aqp1_node_dict, aqp2_node_dict = main()
-
+    # print(qep_node_dict)
+    # print(aqp1_node_dict)
     annotation = Annotate()
     print("Note: run annotation2.py for now")
     # print(
@@ -206,5 +208,3 @@ class main():
     # print("                                                              AQP 2 STRUCTURE                                                               ")
     # print("--------------------------------------------------------------------------------------------------------------------------------------------")
     # annotation.print_plan_plain(aqp2_node_dict)
-
-    
