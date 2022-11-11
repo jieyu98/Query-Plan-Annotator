@@ -2,6 +2,7 @@ import streamlit as st
 from contextlib import contextmanager, redirect_stdout
 from io import StringIO
 import preprocessing
+import annotation
 
 
 class Interface:
@@ -18,11 +19,13 @@ class Interface:
                 # Execute SQL statement and retrieve the node dicts
                 qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main(sql_statement)
 
-                # Annotate
-
                 # Print query plan structure
-                output = st.empty()
-                self.print_query_plain(qep_node_dict, output)
+                structure_output = st.empty()
+                self.print_query_plain(qep_node_dict, structure_output)
+
+                # Annotate
+                annotation_output = st.empty()
+                self.print_annotations(qep_node_dict, aqp1_node_dict, aqp2_node_dict, annotation_output)
 
             st.success('Done!')  # Add reset button here instead maybe
 
@@ -54,6 +57,10 @@ class Interface:
 
             print(f"Total Cost: {total_cost}")
             print(f"Total Time: {node_dict[0][0]['Actual Total Time']}")
+
+    def print_annotations(self, qep_node_dict, aqp1_node_dict, aqp2_node_dict, output):
+        with self.st_capture(output.code):
+            annotation.Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict)
 
     def get_main_details(self, node):
         if node['Node Type'] == 'Seq Scan' or \
