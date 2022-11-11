@@ -49,6 +49,8 @@ class Preprocessor:
         query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + sql_statement),
                                         DEFAULT_SEQ_PAGE_COST, DEFAULT_RAND_PAGE_COST)
         query_plan = query_plan[0][0][0]['Plan']
+        # print(query_plan)
+        query_plan = self.modify_costs(query_plan)  # Modify costs of joins
         return query_plan
 
     # Function to call execute_query to get an aqp by disabling joins in disable_list
@@ -65,6 +67,7 @@ class Preprocessor:
         query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + sql_statement),
                                         DEFAULT_SEQ_PAGE_COST, DEFAULT_RAND_PAGE_COST)
         query_plan = query_plan[0][0][0]['Plan']
+        query_plan = self.modify_costs(query_plan)  # Modify costs of joins
 
         # Enable everything back
         self.cursor.execute('SET enable_nestloop = on;')

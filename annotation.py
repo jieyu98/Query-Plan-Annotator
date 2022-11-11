@@ -1,15 +1,37 @@
 class Annotate:
-    def __init__(self, qep_node_dict, aqp1_node_dict, aqp2_node_dict):
+    def __init__(self, qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement):
         # Extract joins info from node dicts
         qep_join_info = self.extract_join_info(qep_node_dict)
         aqp1_join_info = self.extract_join_info(aqp1_node_dict)
         aqp2_join_info = self.extract_join_info(aqp2_node_dict)
 
-        # Compare and annotate
-        print(qep_join_info)
-        print(aqp1_join_info)
-        print(aqp2_join_info)
+        # Extract scan info from qep node dict
+        qep_scan_info = self.extract_scan_info(qep_node_dict)
 
+        # Perform annotations
+        self.annotate_joins(qep_join_info)
+        self.annotate_tables(qep_scan_info)
+
+    def annotate_tables(self, qep_scan_info):
+        # For each plan, print the plan name and its reasons
+        for table in qep_scan_info:
+
+            print(f"{table[0]} is performed on {table[1]}")
+            main_explanation, additional_info = self.get_annotation(table[0], table[1])
+            print("\t", main_explanation)
+            print("\t", additional_info)
+
+    def annotate_joins(self, qep_join_info):
+        # For each plan, print the plan name and its reasons
+        # need to add the 'This join is implemented using hash join
+        #  operator as NL joins and merge join
+        #  increase the estimated cost by at least 10
+        #  and 7 times, respectively.'
+        for join in qep_join_info:
+            print(f"{join[0]} is performed on conditions {join[1:-1]}")
+            main_explanation, additional_info = self.get_annotation(join[0], join[1:-1])
+            print("\t", main_explanation)
+            print("\t", additional_info)
     def cond_split(self, original_string):
         posAND = original_string.find('AND')
 
@@ -30,6 +52,62 @@ class Annotate:
 
             return [[list[0], list[1]]]
 
+    def extract_scan_info(self, node_dict):
+        scan_info = []
+
+        for level in node_dict:
+            for plan in node_dict[level]:
+                # If
+                if plan['Node Type'] == 'Seq Scan' or plan['Node Type'] == 'Index Scan' or plan[
+                    'Node Type'] == 'Bitmap Scan':
+                    temp = [plan['Node Type']]  # Append node type first
+                    temp.append(plan['Relation Name'])
+                    scan_info.append(temp)
+
+        return scan_info
+
+    def append_table_anno_to_sql_query(self, table_info, sql_statement):
+        # will have to be run only after the joins are appended, otherwise formatting messup
+        sql_statement = format_sql_commands(sql_statement)  # need to do first for this
+        index_of_FROM = sql_statement.find('FROM')
+        tables_substring = sql_statement[index_of_FROM:].split("\n")[0]
+        original_length_table_substring = len(tables_substring)
+        for table in table_info:
+            scan_type = table[0]
+            table_name = table[1]
+            index_to_append = tables_substring.find(table_name)
+            temp_list = list(tables_substring)
+            temp_list.insert(index_to_append + len(table_name), f' (we used am ffkjsdlkjfslkdjfdffkjs dlkjfslkdjfdffkjsdlkjfslk jfdffkjsdlkjfslkdjfdffkjsdlkjfslk djfdffkjsdlkjfslkdjfdffkjsdlkjfslkdjf dffkjsdlkjfslkdjfdffkjsdlkjfslkdjfd  {scan_type})')
+            tables_substring = ''.join(temp_list)
+        tables_list = tables_substring.split(',')
+        new_tables_string = tables_list[0]
+        for statement in tables_list[1:]:
+            new_tables_string += "\n      " + statement
+        # sql_statement = sql_statement[:index_of_FROM] \
+        #                 + new_tables_string \
+        #                 + sql_statement[index_of_FROM + original_length_table_substring:]
+        return new_tables_string
+
+    def append_joins_anno_to_sql_query(self, join_info, sql_statement):
+        # temporary
+        sql_statement = sql_statement.lower()
+        for join in join_info:
+            join_name = join[0]
+            join_cost = join[-1]
+            join_conds = join[1:-1]
+            for join_cond in join_conds:
+                key1 = join_cond[0].split('.')[1].lower()
+                key2 = join_cond[1].split('.')[1].lower()
+                substring1 = f"{key1} = {key2}"
+                substring2 = f"{key2} = {key1}"
+                index_to_append = sql_statement.find(substring1) if substring1 in sql_statement \
+                    else sql_statement.find(substring2)
+                index_to_append += len(substring1)
+                temp_list = list(sql_statement)
+                temp_list.insert(index_to_append, f' (Join implemented using hash join operator because NL joins, merge join increase the estimated cost by at least 10, 7 times, respectively.)')
+                sql_statement = ''.join(temp_list)
+        return format_sql_commands(sql_statement)
+
     def extract_join_info(self, node_dict):
         join_info = []
 
@@ -42,8 +120,9 @@ class Annotate:
                     temp = [plan['Node Type']]  # Append node type first
 
                     info = self.cond_split(plan['Hash Cond'])
-                    for i in range(len(info)):  # Append join info
+                    for i in range(len(info)):  # Append join conditions
                         temp.append(info[i])
+                    temp.append(plan['Node Cost'])
 
                     join_info.append(temp)
 
@@ -51,8 +130,9 @@ class Annotate:
                     temp = [plan['Node Type']]  # Append node type first
 
                     info = self.cond_split(plan['Merge Cond'])
-                    for i in range(len(info)):  # Append join info
+                    for i in range(len(info)):  # Append join conditions
                         temp.append(info[i])
+                    temp.append(plan['Node Cost'])
 
                     join_info.append(temp)
 
@@ -62,8 +142,9 @@ class Annotate:
 
                         info = self.cond_split(plan['Join Filter'])
 
-                        for i in range(len(info)):  # Append join info
+                        for i in range(len(info)):  # Append join conditions
                             temp.append(info[i])
+                        temp.append(plan['Node Cost'])
 
                         join_info.append(temp)
                     else:  # Case where the Nested Loop join does not have a Join Filter attribute
@@ -72,8 +153,9 @@ class Annotate:
                         temp = [plan['Node Type']]  # Append node type first
 
                         info = self.cond_split(conds)
-                        for i in range(len(info)):  # Append join info
+                        for i in range(len(info)):  # Append join conditions
                             temp.append(info[i])
+                        temp.append(plan['Node Cost'])
 
                         join_info.append(temp)
 
@@ -88,14 +170,33 @@ class Annotate:
 
     ##########################################################################################################
 
-    def get_annotation(self, node):
+    def get_annotation(self, type, extra_info):
+        # extra info will be join conditions if we're passing in a join
+        # extra info will be a table name if we're passing in a scan
         main_explaination = "NIL"
         additional_info = ""
 
-        if node['Node Type'] == 'Limit':
-            main_explaination = "Limit is used because only a certain number of rows are required"
+        # Scans
+        if type == 'Seq Scan':
+            main_explaination = "Sequential scan is done because there is no index on the table data or when fetching a few rows from a large table"
+            additional_info = f"Sequential Scan is performed on the relation: {extra_info}"
 
-        if node['Node Type'] == 'Hash Join':
+        if type == 'Index Scan':
+            main_explaination = "Index Scan is done as there is an index on the tables, thus index scan having lower cost as compared to Sequential Scan"
+            additional_info = f"Index Scan is done on the conditions {extra_info}"
+
+        if type == 'Bitmap Scan':
+            main_explaination = "Bitmap Scan is used as the middle ground between index scan and sequential scan, where the number of records chosen may be too much for index scan but too little for sequential scan"
+
+        if type == 'Index Only Scan':
+            main_explaination = "Index scan will access data only through the index and not the table, reducing IO cost, this is used because there is no need to access table data, only index data, for the results"
+            additional_info = f"Index scan involved {extra_info} rows"
+
+        if type == 'Subquery Scan':
+            main_explaination = "Subquery Scan will scan through the results from a child query"
+
+        # Joins
+        if type == 'Hash Join':
             main_explaination = "Hash join is used as there is a hash table created in one of the tables. "
             additional_info = f"Hash Join is used on the condition {node['Hash Cond']}"
 
@@ -109,26 +210,9 @@ class Annotate:
 
         if node['Node Type'] == 'Merge Join':
             main_explaination = "Merge Join is used because the tables are sorted and uses minimal memory"
-            additional_info = f"Merge join is used on the condition {node['Condition']}"
+            additional_info = f"Merge join is used on the condition {extra_info}"
 
-        if node['Node Type'] == 'Sort':
-            main_explaination = "Sort is done for a merge-join to carry out in the later stages"
-            additional_info = f"Sort is done on the key {node['Sort Key']}"
-
-        if node['Node Type'] == 'Index Scan':
-            main_explaination = "Index Scan is done as there is an index on the tables, thus index scan having lower cost as compared to Sequential Scan"
-            additional_info = f"Index Scan is done on the conditions {node['Index Cond']}" \
-                              f"Index Scan is done using filter {node['Filter']}" \
-                              f"There were {node['Rows Removed by Filter']} rows removed by the filter"
-
-        if node['Node Type'] == 'Bitmap Scan':
-            main_explaination = "Bitmap Scan is used as the middle ground between index scan and sequential scan, where the number of records chosen may be too much for index scan but too little for sequential scan"
-
-        if node['Node Type'] == 'Aggregate':
-            main_explaination = "the results from this query plan are aggregated, due to the group-by function"
-            additional_info = f"The aggregation is done on the keys {node['Group Key']}"
-
-        if node['Node Type'] == 'Nested Loop':
+        if type == 'Nested Loop':
             main_explaination = "Nested loop join is used when the records to be looked for is small and the joined columns of the inner row source are uniquely indexed."
 
         if node['Node Type'] == 'Index Only Scan':
@@ -196,41 +280,37 @@ class Annotate:
     #      text += f"QEP uses Nested Loop on relation {node['Relation Name']} while AQP uses Hash Join on the relation {node2['Relation Name']} "
     #      text += "One of the operand has very few rows. Making nested loop more cost efficient compared to hash join."
 
-    def print_plan_with_annotation(self, node_dict):
-        for i in node_dict:
-            if i == 0:
-                node = node_dict[i][0]
-                main_explaination, additional_info = self.get_annotation(node)
-                print(f"\033[1m{node['Node Type']}\033[0m ({main_explaination})")
-            else:
-                node = node_dict[i][0]
-                for j in range(0, i):
-                    print("\t", end='')
-                main_explaination, additional_info = self.get_annotation(node)
-                print("->  ", f"\033[1m{node['Node Type']}\033[0m ({main_explaination})")
-                for j in range(0, i):
-                    print("\t", end='')
-                print(f"     {additional_info}")
+    def compare_join_infos(self, qep_join_info, aqp_join_info, aqp_name):
+        # aqp_name is either 'AQP1' or 'AQP2'
+        differences_list = []
+        for qep_join in qep_join_info:
+            for aqp_join in aqp_join_info:
+                diff_join_type = qep_join[0] != aqp_join[0]  # Boolean to check if join conditions differ
+                # Need to check if the number of join conditions is the same
+                if len(qep_join) == len(aqp_join):  # Same number of join conditions
+                    for i in range(1, len(qep_join) - 1):  # Loop through each join condition
+                        qep_cond = qep_join[i]
+                        aqp_cond = aqp_join[i]
+                        same_cond = qep_cond[0] in aqp_cond and qep_cond[1] in aqp_cond
+                        if not same_cond:
+                            break
+                    else:
+                        if diff_join_type:
+                            cost_diff = round((aqp_join[-1] / qep_join[-1]) * 100, 4)
+                            if cost_diff < 1:
+                                cost_phrasing = f' and the qep join reduced cost by {cost_diff}'
+                            else:
+                                cost_phrasing = f' and the aqp join reduced cost by {cost_diff}'
+                            differences_list.append(
+                                [qep_join[0], ' in the QEP was changed to ', aqp_join[0], f' in {aqp_name}'
+                                                                                          f'{cost_phrasing}'])
+        return differences_list
 
-                if (len(node_dict[i]) > 1):
-                    for j in range(0, i):
-                        print("\t", end='')
-                    node = node_dict[i][1]
-                    main_explaination, additional_info = self.get_annotation(node)
-                    print("->  ", f"\033[1m{node['Node Type']}\033[0m ({main_explaination})")
-                    for j in range(0, i):
-                        print("\t", end='')
-                    print(f"     {additional_info}")
 
 # import preprocessing
 #
-# sql_statement = "SELECT c_custkey,c_name,sum(l_extendedprice * (1 - l_discount)) as revenue,c_acctbal,n_name,c_address,c_phone,c_comment FROM customer,orders,lineitem,nation WHERE c_custkey = o_custkey AND l_orderkey = o_orderkey AND o_orderdate >= date '1993-10-01' AND o_orderdate < date '1993-10-01' + interval '3' month AND l_returnflag = 'R' AND c_nationkey = n_nationkey GROUP BY c_custkey,c_name,c_acctbal,c_phone,n_name,c_address,c_comment ORDER BY revenue desc LIMIT 20;"
-# qep_node_dict, aqp1_node_dict, aqp2_node_dict=preprocessing.main(sql_statement)
-# Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict)
-#     for qep_join in qep_join_info:
-#         for aqp1_join in aqp1_join_info:
-#             diff_join_type = qep_join[0] != aqp1_join[0]
-#             same_keys = qep_join[1][0] in aqp1_join[1] and qep_join[1][1] in aqp1_join[1]
-#             if diff_join_type and same_keys:
-#                 print(qep_join, ' in the QEP was changed to ', aqp1_join, ' in AQP1')
-#
+sql_statement = "SELECT c_custkey,c_name,sum(l_extendedprice * (1 - l_discount)) as revenue,c_acctbal,n_name,c_address,c_phone,c_comment FROM customer,orders,lineitem,nation WHERE c_custkey = o_custkey AND l_orderkey = o_orderkey AND o_orderdate >= date '1993-10-01' AND o_orderdate < date '1993-10-01' + interval '3' month AND l_returnflag = 'R' AND c_nationkey = n_nationkey GROUP BY c_custkey,c_name,c_acctbal,c_phone,n_name,c_address,c_comment ORDER BY revenue desc LIMIT 20;"
+qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main(sql_statement)
+annotator = Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement)
+
+

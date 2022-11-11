@@ -7,6 +7,7 @@ import annotation
 
 class Interface:
     def __init__(self):
+        st.set_page_config(layout="wide")
         st.header("Query Processing")
 
         sql_statement = st.text_area("Type your SQL statement below")
@@ -25,7 +26,7 @@ class Interface:
                 # Annotate
                 st.subheader("Annotation of Query Execution Plan")
                 annotation_output = st.empty()
-                self.print_annotations(qep_node_dict, aqp1_node_dict, aqp2_node_dict, annotation_output)
+                self.print_annotations(qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement, annotation_output)
 
             st.success('Done!')  # Add reset button here instead maybe
 
@@ -58,9 +59,9 @@ class Interface:
             print(f"Total Cost: {total_cost}")
             print(f"Total Time: {node_dict[0][0]['Actual Total Time']}")
 
-    def print_annotations(self, qep_node_dict, aqp1_node_dict, aqp2_node_dict, output):
+    def print_annotations(self, qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement, output):
         with self.st_capture(output.code):
-            annotation.Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict)
+            annotation.Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement)
 
     def get_main_details(self, node):
         if node['Node Type'] == 'Seq Scan' or \
