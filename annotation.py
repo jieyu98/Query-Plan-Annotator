@@ -1,3 +1,8 @@
+from sql_formatter.format_file import format_sql_commands
+
+import preprocessing
+
+
 class Annotate:
     def __init__(self, qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement):
         # Extract joins info from node dicts
@@ -161,12 +166,13 @@ class Annotate:
 
         return join_info
 
+    # def retrieve_child_costs(self, node_dict, level):
+
     def retrieve_child_index_scan_conds(self, node_dict, level):
         for i in range(1, 3):
             for plan in node_dict[level + i]:
                 if plan['Node Type'] == 'Index Scan' and 'Index Cond' in plan:
                     return plan['Index Cond']
-
 
     ##########################################################################################################
 
@@ -198,29 +204,14 @@ class Annotate:
         # Joins
         if type == 'Hash Join':
             main_explaination = "Hash join is used as there is a hash table created in one of the tables. "
-            additional_info = f"Hash Join is used on the condition {node['Hash Cond']}"
+            additional_info = f"Hash Join is used on the condition {extra_info}"
 
-        if node['Node Type'] == 'Seq Scan':
-            main_explaination = "Sequential scan is done because there is no index on the table data or when fetching a few rows from a large table"
-            additional_info = f"Sequential Scan is performed on the relation: {node['Relation Name']}"
-
-        if node['Node Type'] == 'Hash':
-            main_explaination = "Hash is used due to the table is the smaller one and thus minimal memory is required to store the hash table in memory, or for a future hash join"
-            additional_info = f"Hash used {node['Hash Buckets']} buckets"
-
-        if node['Node Type'] == 'Merge Join':
+        if type == 'Merge Join':
             main_explaination = "Merge Join is used because the tables are sorted and uses minimal memory"
             additional_info = f"Merge join is used on the condition {extra_info}"
 
         if type == 'Nested Loop':
             main_explaination = "Nested loop join is used when the records to be looked for is small and the joined columns of the inner row source are uniquely indexed."
-
-        if node['Node Type'] == 'Index Only Scan':
-            main_explaination = "Index scan will access data only through the index and not the table, reducing IO cost, this is used because there is no need to access table data, only index data, for the results"
-            additional_info = f"Index scan involved {node['Plan Rows']} rows"
-
-        if node['Node Type'] == 'Subquery Scan':
-            main_explaination = "Subquery Scan will scan through the results from a child query"
 
         return main_explaination, additional_info
 

@@ -53,6 +53,18 @@ class Preprocessor:
         query_plan = self.modify_costs(query_plan)  # Modify costs of joins
         return query_plan
 
+    # Change total costs of joins from cumulative to just the cost of the join
+    def modify_costs(self, query_plan):
+        cost_of_children = 0
+        if 'Plans' not in query_plan:  # reached a leaf node already
+            return
+        for child in query_plan['Plans']:
+            cost_of_children += child['Total Cost']
+        query_plan['Node Cost'] = round(query_plan['Total Cost'] - cost_of_children, 4)
+        for child in query_plan['Plans']:  # now repeat the process for the child
+            self.modify_costs(child)
+        return query_plan
+
     # Function to call execute_query to get an aqp by disabling joins in disable_list
     def get_aqp(self, sql_statement, disable_list):
         if 'Hash Join' in disable_list:
