@@ -32,22 +32,15 @@ class Preprocessor:
         self.conn.close()
         self.cursor.close()
 
-    # To change sequential and random scan costs of a query
-    def change_parameters(self, seq_page, rand_page):
-        self.cursor.execute("SET seq_page_cost TO " + str(seq_page))
-        self.cursor.execute("SET random_page_cost TO " + str(rand_page))
-
     # Executes a query to retrieve the query plan
-    def execute_query(self, sql_statement, seq_cost, rand_cost):
-        self.change_parameters(seq_cost, rand_cost)  # Set parameters of the query
+    def execute_query(self, sql_statement):
         self.cursor.execute(sql_statement)  # Execute query
         query_plan = self.cursor.fetchall()  # Fetch the query plan
         return query_plan
 
     # Calls execute_query function to get qep
     def get_qep(self, sql_statement):
-        query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + sql_statement),
-                                        DEFAULT_SEQ_PAGE_COST, DEFAULT_RAND_PAGE_COST)
+        query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + sql_statement))
         query_plan = query_plan[0][0][0]['Plan']
         query_plan = self.modify_costs(query_plan)  # Modify costs of joins
         return query_plan
@@ -75,8 +68,7 @@ class Preprocessor:
         if 'Nested Loop' in disable_list:
             self.cursor.execute('SET enable_nestloop = off;')
 
-        query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + sql_statement),
-                                        DEFAULT_SEQ_PAGE_COST, DEFAULT_RAND_PAGE_COST)
+        query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + sql_statement))
         query_plan = query_plan[0][0][0]['Plan']
         query_plan = self.modify_costs(query_plan)  # Modify costs of joins
 
