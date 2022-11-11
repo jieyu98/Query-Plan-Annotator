@@ -49,6 +49,11 @@ class Interface:
 
             st.success('Done!')  # Add reset button here instead maybe
 
+        # if st.button('Reset'):
+        #     with st.spinner('Resetting...'):
+
+
+
     def print_query_plain(self, node_dict, output):
         with self.st_capture(output.code):
             total_cost = 0

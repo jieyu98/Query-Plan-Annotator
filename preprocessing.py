@@ -142,7 +142,6 @@ def main(sql_statement):
     # Get qep and populate qep_node_dict
     qep = query_processor.get_qep(sql_statement)
     query_processor.get_nodes(qep, 0, qep_node_dict)
-
     disable_list = []
 
     # Get disable list for aqp1
