@@ -1,9 +1,7 @@
 import pandas as pd
 from sql_formatter.format_file import format_sql_commands
-import seaborn as sns
 import pandas as pd
-import preprocessing
-
+import altair as alt
 
 class Annotate:
     def __init__(self, qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement):
@@ -18,6 +16,7 @@ class Annotate:
 
         # Extract scan info from qep node dict
         self.qep_scan_info = self.extract_scan_info(qep_node_dict)
+        print(self.qep_scan_info)
 
     def create_barchart(self):
         _dict = {'qep_time': self.qep_node_dict[0][0]['Actual Total Time'],
@@ -72,9 +71,7 @@ class Annotate:
 
         for level in node_dict:
             for plan in node_dict[level]:
-                # If
-                if plan['Node Type'] == 'Seq Scan' or plan['Node Type'] == 'Index Scan' or plan[
-                    'Node Type'] == 'Bitmap Scan':
+                if plan['Node Type'] == 'Seq Scan' or plan['Node Type'] == 'Index Scan' or plan['Node Type'] == 'Bitmap Scan':
                     temp = [plan['Node Type']]  # Append node type first
                     temp.append(plan['Relation Name'])
                     scan_info.append(temp)
@@ -313,35 +310,112 @@ class Annotate:
                                 0] + f' in {aqp_name}, the qep join reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
                             return difference
 
-    def compare_join_infos(self, qep_join_info, aqp_join_info, aqp_name):
-        # aqp_name is either 'AQP1' or 'AQP2'
-        differences_list = []
-        for qep_join in qep_join_info:
-            for aqp_join in aqp_join_info:
-                diff_join_type = qep_join[0] != aqp_join[0]  # Boolean to check if join conditions differ
-                # Need to check if the number of join conditions is the same
-                if len(qep_join) == len(aqp_join):  # Same number of join conditions
-                    for i in range(1, len(qep_join) - 1):  # Loop through each join condition
-                        qep_cond = qep_join[i]
-                        aqp_cond = aqp_join[i]
-                        same_cond = qep_cond[0] in aqp_cond and qep_cond[1] in aqp_cond
-                        if not same_cond:
-                            break
-                    else:
-                        if diff_join_type:
-                            cost_diff = round((aqp_join[-1] / qep_join[-1]) * 100, 4)
-                            if cost_diff < 1:
-                                cost_phrasing = f' and the qep join reduced cost by {cost_diff}'
-                            else:
-                                cost_phrasing = f' and the aqp join reduced cost by {cost_diff}'
-                            differences_list.append(
-                                [qep_join[0], ' in the QEP was changed to ', aqp_join[0], f' in {aqp_name}'
-                                                                                          f'{cost_phrasing}'])
-        return differences_list
+    def get_node_diff_reasons(self, qep_node, aqp_node, extra_info):
+        text = ""
+        if qep_node['Node Type'] == "Index Scan" and aqp_node['Node Type'] == "Seq Scan":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Index Scan on relation {extra_info} while AQP uses Sequential Scan on relation {extra_info} "
+            text += "Sequential Scan is used to scan over the entire table, which is less efficient as compared to Index Scan "
 
+        if qep_node['Node Type'] == "Seq Scan" and aqp_node['Node Type'] == "Index Scan":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Sequential Scan on relation {extra_info} while AQP uses Index Scan on relation {extra_info} "
+            text += "Given the index scan's higher per row cost and the low selectivity of the scan predicate, sequential scan would be a better option to use compared to index scan due to lower cost"
 
-# import preprocessing
-#
-sql_statement = "SELECT c_custkey,c_name,sum(l_extendedprice * (1 - l_discount)) as revenue,c_acctbal,n_name,c_address,c_phone,c_comment FROM customer,orders,lineitem,nation WHERE c_custkey = o_custkey AND l_orderkey = o_orderkey AND o_orderdate >= date '1993-10-01' AND o_orderdate < date '1993-10-01' + interval '3' month AND l_returnflag = 'R' AND c_nationkey = n_nationkey GROUP BY c_custkey,c_name,c_acctbal,c_phone,n_name,c_address,c_comment ORDER BY revenue desc LIMIT 20;"
-qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main(sql_statement)
-annotator = Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement)
+        if qep_node['Node Type'] == "Index Scan" and aqp_node['Node Type'] == "Bitmap Scan":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Index Scan on relation {extra_info} while AQP uses Bitmap Scan on relation {extra_info} "
+            text += "Since the scan predicate, {qep_node[Index Condition]}, has high selectivity, it is more preferrable to use Index Scan instead of Bitmap Scan"
+
+        if qep_node['Node Type'] == "Bitmap Scan" and aqp_node['Node Type'] == "Index Scan":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Bitmap Scan on relation {extra_info} while AQP uses Index Scan on relation {extra_info} "
+            text += "Since the scan predicate, {qep_node[Index Condition]}, has low selectivity,Bitmap scan is preferred to Index Scan"
+
+        if qep_node['Node Type'] == "Merge Join" and aqp_node['Node Type'] == "Nested Loop":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Nested Loop on relation {extra_info} while AQP uses Merge Join on the relation {extra_info} "
+            text += "Since the relations to be joined are already sorted, Merge Join would be preferrable over Nested Loop"
+
+        if qep_node['Node Type'] == "Nested Loop" and aqp_node['Node Type'] == "Merge Join":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Merge Join on relation {extra_info} while AQP uses Nested Loop on the relation {extra_info} "
+            text += "Since the outer loop relation is relatively small and all tuples with the same join attribute values cannot fit into memory, nested loop will be more cost efficient than merge join."
+
+        if qep_node['Node Type'] == "Merge Join" and aqp_node['Node Type'] == "Hash Join":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Merge Join on relation {extra_info} while AQP uses Hash Join on the relation {extra_info} "
+            text += "Given that the hash table does not fit into the memory, hash join becomes slower and less preferrable compared to merge join."
+
+        if qep_node['Node Type'] == "Hash Join" and aqp_node['Node Type'] == "Merge Join":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Hash Join on relation {extra_info} while AQP uses Merge Join on the relation {extra_info} "
+            text += "Hash table can fit into memory, thus reducing the hash join cost, making it more preferrable than the merge join."
+
+        if qep_node['Node Type'] == "Hash Join" and aqp_node['Node Type'] == "Nested Loop":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Hash Join on relation {extra_info} while AQP uses Nested Loop on the relation {extra_info} "
+            text += "Hash table can fit into memory, reducing cost of hash join, thus making it better compared to nested loop."
+
+        if qep_node['Node Type'] == "Nested Loop" and aqp_node['Node Type'] == "Hash Join":
+            text = f"Difference Reasoning: "
+            text += f"QEP uses Nested Loop on relation {extra_info} while AQP uses Hash Join on the relation {extra_info} "
+            text += "One of the operand has very few rows. Making nested loop more cost efficient compared to hash join."
+        return text
+
+    # def node_diff_reasons(self, node_dict, node_dict2):
+    #     for i in node_dict:
+    #         text = ""
+    #         node = node_dict[i][0]
+    #         node2 = node_dict2[i][0]
+    #
+    #         if node['Node Type'] == "Index Scan" and node2['Node Type'] == "Seq Scan":
+    #             text = f"Difference Reasoning: "
+    #             text += f"QEP uses Index Scan on relation {node['Relation Name']} while AQP uses Sequential Scan on relation {node2['Relation Name']} "
+    #             text += "Sequential Scan is used to scan over the entire table, which is less efficient as compared to Index Scan "
+    #
+    #         if node['Node Type'] == "Seq Scan" and node2['Node Type'] == "Index Scan":
+    #             text = f"Difference Reasoning: "
+    #             text += f"QEP uses Sequential Scan on relation {node['Relation Name']} while AQP uses Index Scan on relation {node2['Relation Name']} "
+    #             text += "Given the index scan's higher per row cost and the low selectivity of the scan predicate, sequential scan would be a better option to use compared to index scan due to lower cost"
+    #
+    #         if node['Node Type'] == "Index Scan" and node2['Node Type'] == "Bitmap Scan":
+    #             text = f"Difference Reasoning: "
+    #             text += f"QEP uses Index Scan on relation {node['Relation Name']} while AQP uses Bitmap Scan on relation {node2['Relation Name']} "
+    #             text += "Since the scan predicate, {node[Index Condition]}, has high selectivity, it is more preferrable to use Index Scan instead of Bitmap Scan"
+    #
+    #         if node['Node Type'] == "Bitmap Scan" and node2['Node Type'] == "Index Scan":
+    #             text = f"Difference Reasoning: "
+    #             text += f"QEP uses Bitmap Scan on relation {node['Relation Name']} while AQP uses Index Scan on relation {node2['Relation Name']} "
+    #             text += "Since the scan predicate, {node[Index Condition]}, has low selectivity,Bitmap scan is preferred to Index Scan"
+    #
+    #         if node['Node Type'] == "Merge Join" and node2['Node Type'] == "Nested Loop":
+    #             text = f"Difference Reasoning: "
+    #             text += f"QEP uses Nested Loop on relation {node['Relation Name']} while AQP uses Merge Join on the relation {node2['Relation Name']} "
+    #             text += "Since the relations to be joined are already sorted, Merge Join would be preferrable over Nested Loop"
+    #
+    #         if node['Node Type'] == "Nested Loop" and node2['Node Type'] == "Merge Join":
+    #            text = f"Difference Reasoning: "
+    #            text += f"QEP uses Merge Join on relation {node['Relation Name']} while AQP uses Nested Loop on the relation {node2['Relation Name']} "
+    #            text += "Since the outer loop relation is relatively small and all tuples with the same join attribute values cannot fit into memory, nested loop will be more cost efficient than merge join."
+    #
+    #         if node['Node Type'] == "Merge Join" and node2['Node Type'] == "Hash Join":
+    #            text = f"Difference Reasoning: "
+    #            text += f"QEP uses Merge Join on relation {node['Relation Name']} while AQP uses Hash Join on the relation {node2['Relation Name']} "
+    #            text += "Given that the hash table does not fit into the memory, hash join becomes slower and less preferrable compared to merge join."
+    #
+    #         if node['Node Type'] == "Hash Join" and node2['Node Type'] == "Merge Join":
+    #             text = f"Difference Reasoning: "
+    #             text += f"QEP uses Hash Join on relation {node['Relation Name']} while AQP uses Merge Join on the relation {node2['Relation Name']} "
+    #             text += "Hash table can fit into memory, thus reducing the hash join cost, making it more preferrable than the merge join."
+    #
+    #         if node['Node Type'] == "Hash Join" and node2['Node Type'] == "Nested Loop":
+    #             text = f"Difference Reasoning: "
+    #             text += f"QEP uses Hash Join on relation {node['Relation Name']} while AQP uses Nested Loop on the relation {node2['Relation Name']} "
+    #             text += "Hash table can fit into memory, reducing cost of hash join, thus making it better compared to nested loop."
+    #
+    #         if node['Node Type'] == "Nested Loop" and node2['Node Type'] == "Hash Join":
+    #             text = f"Difference Reasoning: "
+    #             text += f"QEP uses Nested Loop on relation {node['Relation Name']} while AQP uses Hash Join on the relation {node2['Relation Name']} "
+    #             text += "One of the operand has very few rows. Making nested loop more cost efficient compared to hash join."
+    #     return text

@@ -7,7 +7,7 @@ import annotation
 
 class Interface:
     def __init__(self):
-        st.set_page_config(layout="wide")
+        st.set_page_config(page_title="CZ4031 Group", layout="wide")
         st.title("Query Processing")
 
         sql_statement = st.text_area("Type your SQL statement below")
@@ -31,10 +31,21 @@ class Interface:
                 join_output = st.empty()
 
                 # Display graphs
+                st.header("Data Visualization")
+                col1, col2 = st.columns(2)
+
                 annotator = annotation.Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement)
-                st.bar_chart(data=annotator.create_barchart())
+                time_data = annotator.create_time_chart()
+                cost_data = annotator.create_cost_chart()
+
+                with col1:
+                    st.altair_chart(time_data, use_container_width=True)
+
+                with col2:
+                    st.altair_chart(cost_data, use_container_width=True)
 
                 self.print_annotations(annotator, join_output, table_output)
+
 
             st.success('Done!')  # Add reset button here instead maybe
 
@@ -69,6 +80,7 @@ class Interface:
     def print_annotations(self, annotator, join_output, table_output):
         with self.st_capture(table_output.code):
             annotator.annotate_tables(annotator.qep_scan_info)
+            print(annotator.qep_scan_info)
 
         with self.st_capture(join_output.code):
             annotator.annotate_joins(annotator.qep_join_info, annotator.aqp1_join_info, annotator.aqp2_join_info)
