@@ -186,8 +186,6 @@ class Annotate:
                 if plan['Node Type'] == 'Index Scan' and 'Index Cond' in plan:
                     return plan['Index Cond']
 
-    ##########################################################################################################
-
     def get_annotation(self, type, extra_info):
         # extra info will be join conditions if we're passing in a join
         # extra info will be a table name if we're passing in a scan

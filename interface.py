@@ -8,7 +8,7 @@ import annotation
 class Interface:
     def __init__(self):
         st.set_page_config(layout="wide")
-        st.header("Query Processing")
+        st.title("Query Processing")
 
         sql_statement = st.text_area("Type your SQL statement below")
 
@@ -19,14 +19,22 @@ class Interface:
                 qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main(sql_statement)
 
                 # Print query plan structure
-                st.subheader("Structure of the Query Execution Plan")
+                st.header("Structure of the Query Execution Plan")
                 structure_output = st.empty()
                 self.print_query_plain(qep_node_dict, structure_output)
 
                 # Annotate
-                st.subheader("Annotation of Query Execution Plan")
-                annotation_output = st.empty()
-                self.print_annotations(qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement, annotation_output)
+                st.header("Annotation of Query Execution Plan")
+                st.subheader("Types of Scans Used")
+                table_output = st.empty()
+                st.subheader("Types of Joins Used")
+                join_output = st.empty()
+
+                # Display graphs
+                annotator = annotation.Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement)
+                st.bar_chart(data=annotator.create_barchart())
+
+                self.print_annotations(annotator, join_output, table_output)
 
             st.success('Done!')  # Add reset button here instead maybe
 
