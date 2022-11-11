@@ -13,17 +13,17 @@ class Interface:
 
         # When execute button is clicked
         if st.button("Execute"):
-            st.subheader("Structure of the query is as follows:")
-
             with st.spinner('Wait for it...'):
                 # Execute SQL statement and retrieve the node dicts
                 qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main(sql_statement)
 
                 # Print query plan structure
+                st.subheader("Structure of the Query Execution Plan")
                 structure_output = st.empty()
                 self.print_query_plain(qep_node_dict, structure_output)
 
                 # Annotate
+                st.subheader("Annotation of Query Execution Plan")
                 annotation_output = st.empty()
                 self.print_annotations(qep_node_dict, aqp1_node_dict, aqp2_node_dict, annotation_output)
 

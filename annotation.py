@@ -82,7 +82,7 @@ class Annotate:
     def retrieve_child_index_scan_conds(self, node_dict, level):
         for i in range(1, 3):
             for plan in node_dict[level + i]:
-                if plan['Node Type'] == 'Index Scan':
+                if plan['Node Type'] == 'Index Scan' and 'Index Cond' in plan:
                     return plan['Index Cond']
 
 
@@ -222,6 +222,11 @@ class Annotate:
                         print("\t", end='')
                     print(f"     {additional_info}")
 
+# import preprocessing
+#
+# sql_statement = "SELECT c_custkey,c_name,sum(l_extendedprice * (1 - l_discount)) as revenue,c_acctbal,n_name,c_address,c_phone,c_comment FROM customer,orders,lineitem,nation WHERE c_custkey = o_custkey AND l_orderkey = o_orderkey AND o_orderdate >= date '1993-10-01' AND o_orderdate < date '1993-10-01' + interval '3' month AND l_returnflag = 'R' AND c_nationkey = n_nationkey GROUP BY c_custkey,c_name,c_acctbal,c_phone,n_name,c_address,c_comment ORDER BY revenue desc LIMIT 20;"
+# qep_node_dict, aqp1_node_dict, aqp2_node_dict=preprocessing.main(sql_statement)
+# Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict)
 #     for qep_join in qep_join_info:
 #         for aqp1_join in aqp1_join_info:
 #             diff_join_type = qep_join[0] != aqp1_join[0]

@@ -129,8 +129,6 @@ class Preprocessor:
 def main(sql_statement):
     query_processor = Preprocessor()
 
-    sql_statement = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey" #REM TO COMMENT THIS OUT
-
     qep_node_dict = {}
     aqp1_node_dict = {}
     aqp2_node_dict = {}
