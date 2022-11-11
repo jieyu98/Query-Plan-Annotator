@@ -49,7 +49,7 @@ class Preprocessor:
         query_plan = self.execute_query(self.cursor.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + sql_statement),
                                         DEFAULT_SEQ_PAGE_COST, DEFAULT_RAND_PAGE_COST)
         query_plan = query_plan[0][0][0]['Plan']
-        # print(query_plan)
+        #print(query_plan)
         query_plan = self.modify_costs(query_plan)  # Modify costs of joins
         return query_plan
 
@@ -157,11 +157,13 @@ def main(sql_statement):
     # Get disable list for aqp1
     disable_list = query_processor.get_disable_list(disable_list, qep_node_dict)
     print(f"AQP1 Disabled: {disable_list}")
+    #print(qep_node_dict)
 
     # Get aqp1 and populate aqp1_node_dict
     print('first disable list', disable_list)
     aqp1 = query_processor.get_aqp(sql_statement, disable_list)
     query_processor.get_nodes(aqp1, 0, aqp1_node_dict)
+    #print(aqp1_node_dict)
 
     # Get disable list for aqp2
     disable_list = query_processor.get_disable_list(disable_list, aqp1_node_dict)
@@ -171,5 +173,7 @@ def main(sql_statement):
     print('second disable list', disable_list)
     aqp2 = query_processor.get_aqp(sql_statement, disable_list)
     query_processor.get_nodes(aqp2, 0, aqp2_node_dict)
+    #print(aqp2_node_dict)
+
 
     return qep_node_dict, aqp1_node_dict, aqp2_node_dict
