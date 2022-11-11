@@ -17,7 +17,6 @@ class Annotate:
 
         # Extract scan info from qep node dict
         self.qep_scan_info = self.extract_scan_info(qep_node_dict)
-        print(self.qep_scan_info)
 
     def create_time_chart(self):
         source = pd.DataFrame({

@@ -85,7 +85,6 @@ class Interface:
     def print_annotations(self, annotator, join_output, table_output):
         with self.st_capture(table_output.code):
             annotator.annotate_tables(annotator.qep_scan_info)
-            print(annotator.qep_scan_info)
 
         with self.st_capture(join_output.code):
             annotator.annotate_joins(annotator.qep_join_info, annotator.aqp1_join_info, annotator.aqp2_join_info)
