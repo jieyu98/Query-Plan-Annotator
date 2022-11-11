@@ -8,23 +8,49 @@ import annotation
 class Interface:
     def __init__(self):
         st.set_page_config(page_title="CZ4031 Group", layout="wide")
-        st.title("Query Processing")
+        st.title("Query Processing Annotator")
+        st.caption("A project for NTU CZ4031 Database System Principles by Group 40")
 
         sql_statement = st.text_area("Type your SQL statement below")
 
+        execute = st.button("Execute")
+
+        # Initialize session state
+        if "load_state" not in st.session_state:
+            st.session_state.load_state = False
+
         # When execute button is clicked
-        if st.button("Execute"):
+        if execute or st.session_state.load_state:
+            st.session_state.load_state = True
+
             with st.spinner('Wait for it...'):
                 # Execute SQL statement and retrieve the node dicts
                 qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main(sql_statement)
 
                 # Print query plan structure
-                st.header("Structure of the Query Execution Plan")
-                structure_output = st.empty()
-                self.print_query_plain(qep_node_dict, structure_output)
+                st.header("Structure of the Query Plan")
+
+                col1, col2 = st.columns([1, 2])
+
+                with col1:
+                    structure_option = st.selectbox(
+                        'Which query plan would you like to see?',
+                        ('QEP', 'AQP1', 'AQP2'))
+
+                with col2:
+                    structure_output = st.empty()
+
+                    if structure_option == 'QEP':
+                        self.print_query_plain(qep_node_dict, structure_output)
+                    elif structure_option == 'AQP1':
+                        self.print_query_plain(aqp1_node_dict, structure_output)
+                    elif structure_option == 'AQP2':
+                        self.print_query_plain(aqp2_node_dict, structure_output)
 
                 # Annotate
-                st.header("Annotation of Query Execution Plan")
+                st.header("Annotation of Query Execution Plan (QEP)")
+                st.caption("Note that the annotations below are for the QEP (i.e. The most efficient plan)")
+
                 st.subheader("Types of Scans Used")
                 table_output = st.empty()
                 st.subheader("Types of Joins Used")
