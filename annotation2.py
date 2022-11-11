@@ -81,14 +81,25 @@ class main():
     qep_node_dict, aqp1_node_dict, aqp2_node_dict = main()
 
     annotation = Annotate()
-    join_info = annotation.extract_join_info(qep_node_dict)
+    qep_join_info = annotation.extract_join_info(qep_node_dict)
     print("QEP")
-    print(join_info)
-    join_info = annotation.extract_join_info(aqp1_node_dict)
+    print(qep_join_info)
+    aqp1_join_info = annotation.extract_join_info(aqp1_node_dict)
     print("AQP1")
-    print(join_info)
-    join_info = annotation.extract_join_info(aqp2_node_dict)
+    print(aqp1_join_info)
+    aqp2_join_info = annotation.extract_join_info(aqp2_node_dict)
     print("AQP2")
-    print(join_info)
+    print(aqp2_join_info)
+
+    for qep_join in qep_join_info:
+        for aqp1_join in aqp1_join_info:
+            diff_join_type = qep_join[0] != aqp1_join[0]
+            same_keys = qep_join[1][0] in aqp1_join[1] and qep_join[1][1] in aqp1_join[1]
+            if diff_join_type and same_keys:
+                print(qep_join, ' in the QEP was changed to ', aqp1_join, ' in AQP1')
 
 
+
+
+
+main()
