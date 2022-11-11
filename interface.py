@@ -41,17 +41,17 @@ class Interface:
                     if len(node_dict[i]) == 1:
                         node = node_dict[i][0]
                         for j in range(0, i):
-                            print("\t", end='')
+                            print("  ", end='')
                         print("└── ", f"{node['Node Type']} {self.get_main_details(node)}")
                     else:
                         # More than 1 plans
                         for j in range(0, i):
-                            print("\t", end='')
+                            print("  ", end='')
                         node = node_dict[i][0]
                         print("├── ", f"{node['Node Type']} {self.get_main_details(node)}")
 
                         for j in range(0, i):
-                            print("\t", end='')
+                            print("  ", end='')
                         node = node_dict[i][1]
                         print("└── ", f"{node['Node Type']} {self.get_main_details(node)}")
 
@@ -76,11 +76,6 @@ class Interface:
         if node['Node Type'] == 'Nested Loop':
             if 'Join Filter' in node:
                 return node['Join Filter']
-            # else
-            # look one level down to find a child with node type index scan
-            # get index cond
-            # if _pkey in child_name
-            #
 
         return ""
 
