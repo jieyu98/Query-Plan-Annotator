@@ -1,4 +1,4 @@
-from preprocessing import main
+import preprocessing
 
 
 class Annotate:
@@ -138,23 +138,11 @@ class Annotate:
 
 
 class main():
-    qep_node_dict, aqp1_node_dict, aqp2_node_dict = main()
-    # print(qep_node_dict)
-    # print(aqp1_node_dict)
-    annotation = Annotate()
-    annotation.print_plan_plain(qep_node_dict)
-    print("Note: run annotation2.py for now")
-    # print(
-    #     "                                                            QUERY PLAN STRUCTURE                                                            ")
-    # print(
-    #     "--------------------------------------------------------------------------------------------------------------------------------------------")
-    # annotation.print_plan_plain(aqp2_node_dict)
-    # # print("                                                                 QUERY PLAN                                                                 ")
-    # # print("--------------------------------------------------------------------------------------------------------------------------------------------")
-    # # annotation.print_plan_with_annotation(qep_node_dict)
-    # print("                                                              AQP 1 STRUCTURE                                                               ")
-    # print("--------------------------------------------------------------------------------------------------------------------------------------------")
-    # annotation.print_plan_plain(aqp1_node_dict)
-    # print("                                                              AQP 2 STRUCTURE                                                               ")
-    # print("--------------------------------------------------------------------------------------------------------------------------------------------")
-    # annotation.print_plan_plain(aqp2_node_dict)
+    qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main()
+    preprocessor = preprocessing.Preprocessor()
+
+    qep_join_info = preprocessor.extract_join_info(qep_node_dict)
+
+    print(qep_join_info)
+
+    # annotation = Annotate()

@@ -1,11 +1,31 @@
 import streamlit as st
-import preprocessing
-import time
 from contextlib import contextmanager, redirect_stdout
 from io import StringIO
+import preprocessing
 
 
 class Interface:
+    def __init__(self):
+        st.header("Query Processing")
+
+        sql_statement = st.text_area("Type your SQL statement below")
+
+        # When execute button is clicked
+        if st.button("Execute"):
+            st.subheader("Structure of the query is as follows:")
+
+            with st.spinner('Wait for it...'):
+                # Execute SQL statement and retrieve the node dicts
+                qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main(sql_statement)
+
+                # Annotate
+
+                # Print query plan structure
+                output = st.empty()
+                self.print_query_plain(qep_node_dict, output)
+
+            st.success('Done!')  # Add reset button here instead maybe
+
     def print_query_plain(self, node_dict, output):
         with self.st_capture(output.code):
             total_cost = 0
@@ -69,30 +89,6 @@ class Interface:
 
             stdout.write = new_write
             yield
-
-class main():
-    st.header("Query Processing")
-
-    st.text_area("Type your SQL statement below")
-
-    if st.button("Execute"):
-        st.subheader("Structure of the query is as follows:")
-
-        with st.spinner('Wait for it...'):
-            # hard coded for now
-            qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main()
-
-            interface = Interface()
-
-            output = st.empty()
-
-            interface.print_query_plain(qep_node_dict, output)
-
-        st.success('Done!')  # Add reset button here instead maybe
-
-
-
-main()
 
 
 

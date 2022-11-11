@@ -1,5 +1,12 @@
 from psycopg2 import connect
 
+# Specify DB credentials here
+DBNAME = "TPC-H"
+USER = "jy"
+PASSWORD = "password"
+PORT = "5432"
+HOST = "localhost"
+
 DEFAULT_SEQ_PAGE_COST = 1.0
 DEFAULT_RAND_PAGE_COST = 5.0
 
@@ -13,11 +20,11 @@ class Preprocessor:
     # To begin connection
     def begin_connection(self):
         return connect(
-            dbname="TPC-H",
-            user="jy",
-            password="password",
-            port="5432",
-            host="localhost",
+            dbname=DBNAME,
+            user=USER,
+            password=PASSWORD,
+            port=PORT,
+            host=HOST,
         )
 
     # To stop connection
@@ -118,11 +125,86 @@ class Preprocessor:
 
         return disable_list
 
+    def cond_split(self, original_string):
+        posAND = original_string.find('AND')
 
-def main():
+        if posAND >= 0:  # found AND
+
+            newString = original_string[:posAND - 1] + ' = ' + original_string[posAND + 4:]
+            newString = newString.replace('(', '')
+            newString = newString.replace(')', '')
+
+            list = newString.split(' = ')
+            return [[list[0], list[1]], [list[2], list[3]]]
+        else:  # no AND
+            # sample string "(customer.c_nationkey = supplier.s_nationkey)"
+            newString = original_string.replace('(', '')
+            newString = newString.replace(')', '')
+
+            list = newString.split(' = ')
+            return [[list[0], list[1]]]
+
+
+    def extract_join_info(self, node_dict):
+        join_info = []
+
+        # Loop through each level
+        for level in node_dict:
+            # Loop through each plan
+            for plan in node_dict[level]:
+                # Search for joins - Hash join, nested loop, merge join
+                if plan['Node Type'] == 'Hash Join':
+                    temp = [plan['Node Type']]  # Append node type first
+
+                    info = self.cond_split(plan['Hash Cond'])
+                    for i in range(len(info)):  # Append join info
+                        temp.append(info[i])
+
+                    join_info.append(temp)
+
+                if plan['Node Type'] == 'Merge Join':
+                    temp = [plan['Node Type']]  # Append node type first
+
+                    info = self.cond_split(plan['Merge Cond'])
+                    for i in range(len(info)):  # Append join info
+                        temp.append(info[i])
+
+                    join_info.append(temp)
+
+                if plan['Node Type'] == 'Nested Loop':
+                    if 'Join Filter' in plan:
+                        temp = [plan['Node Type']]  # Append node type first
+
+                        info = self.cond_split(plan['Join Filter'])
+
+                        for i in range(len(info)):  # Append join info
+                            temp.append(info[i])
+
+                        join_info.append(temp)
+                    else:  # Case where the Nested Loop join does not have a Join Filter attribute
+                        conds = self.retrieve_child_index_scan_conds(node_dict, level)  # Get from child
+
+                        temp = [plan['Node Type']]  # Append node type first
+
+                        info = self.cond_split(conds)
+                        for i in range(len(info)):  # Append join info
+                            temp.append(info[i])
+
+                        join_info.append(temp)
+
+        return join_info
+
+    def retrieve_child_index_scan_conds(self, node_dict, level):
+        for i in range(1, 3):
+            for plan in node_dict[level + i]:
+                if plan['Node Type'] == 'Index Scan':
+                    return plan['Index Cond']
+
+
+def main(sql_statement):
     query_processor = Preprocessor()
 
-    sql_statement = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
+    # sql_statement = "SELECT * FROM customer C, orders O WHERE C.c_custkey = O.o_custkey"
 
     qep_node_dict = {}
     aqp1_node_dict = {}
