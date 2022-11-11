@@ -34,7 +34,6 @@ class Interface:
         with self.st_capture(output.code):
             total_cost = 0
             for i in node_dict:
-                total_cost += node_dict[i][0]['Total Cost']
                 if i == 0:
                     node = node_dict[i][0]
                     print(f"{node['Node Type']} {self.get_main_details(node)}")
@@ -56,12 +55,16 @@ class Interface:
                         node = node_dict[i][1]
                         print("└── ", f"{node['Node Type']} {self.get_main_details(node)}")
 
-            print(f"Total Cost: {total_cost}")
+            print(f"Total Cost: {node_dict[0][0]['Total Cost']}")
             print(f"Total Time: {node_dict[0][0]['Actual Total Time']}")
 
-    def print_annotations(self, qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement, output):
-        with self.st_capture(output.code):
-            annotation.Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement)
+    def print_annotations(self, annotator, join_output, table_output):
+        with self.st_capture(table_output.code):
+            annotator.annotate_tables(annotator.qep_scan_info)
+
+        with self.st_capture(join_output.code):
+            annotator.annotate_joins(annotator.qep_join_info, annotator.aqp1_join_info, annotator.aqp2_join_info)
+
 
     def get_main_details(self, node):
         if node['Node Type'] == 'Seq Scan' or \

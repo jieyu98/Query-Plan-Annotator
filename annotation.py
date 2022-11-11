@@ -1,42 +1,52 @@
+import pandas as pd
 from sql_formatter.format_file import format_sql_commands
-
+import seaborn as sns
+import pandas as pd
 import preprocessing
 
 
 class Annotate:
     def __init__(self, qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement):
+        self.qep_node_dict = qep_node_dict
+        self.aqp1_node_dict = aqp1_node_dict
+        self.aqp2_node_dict = aqp2_node_dict
+
         # Extract joins info from node dicts
-        qep_join_info = self.extract_join_info(qep_node_dict)
-        aqp1_join_info = self.extract_join_info(aqp1_node_dict)
-        aqp2_join_info = self.extract_join_info(aqp2_node_dict)
+        self.qep_join_info = self.extract_join_info(qep_node_dict)
+        self.aqp1_join_info = self.extract_join_info(aqp1_node_dict)
+        self.aqp2_join_info = self.extract_join_info(aqp2_node_dict)
 
         # Extract scan info from qep node dict
-        qep_scan_info = self.extract_scan_info(qep_node_dict)
+        self.qep_scan_info = self.extract_scan_info(qep_node_dict)
 
-        # Perform annotations
-        self.annotate_joins(qep_join_info)
-        self.annotate_tables(qep_scan_info)
+    def create_barchart(self):
+        _dict = {'qep_time': self.qep_node_dict[0][0]['Actual Total Time'],
+                 'aqp1_time': self.aqp1_node_dict[0][0]['Actual Total Time'],
+                 'aqp2_time': self.aqp2_node_dict[0][0]['Actual Total Time']}
+        df = pd.DataFrame.from_dict(_dict)
+        return df
+
+
 
     def annotate_tables(self, qep_scan_info):
         # For each plan, print the plan name and its reasons
         for table in qep_scan_info:
-
             print(f"{table[0]} is performed on {table[1]}")
             main_explanation, additional_info = self.get_annotation(table[0], table[1])
             print("\t", main_explanation)
             print("\t", additional_info)
 
-    def annotate_joins(self, qep_join_info):
-        # For each plan, print the plan name and its reasons
-        # need to add the 'This join is implemented using hash join
-        #  operator as NL joins and merge join
-        #  increase the estimated cost by at least 10
-        #  and 7 times, respectively.'
+    def annotate_joins(self, qep_join_info, aqp1_join_info, aqp2_join_info):
         for join in qep_join_info:
             print(f"{join[0]} is performed on conditions {join[1:-1]}")
             main_explanation, additional_info = self.get_annotation(join[0], join[1:-1])
             print("\t", main_explanation)
             print("\t", additional_info)
+            difference = self.compare_join_infos_for_annot(join, aqp1_join_info, 'AQP1')
+            difference2 = self.compare_join_infos_for_annot(join, aqp2_join_info, 'AQP2')
+            print("\t", difference) if difference else None
+            print("\t", difference2) if difference2 else None
+
     def cond_split(self, original_string):
         posAND = original_string.find('AND')
 
@@ -82,7 +92,8 @@ class Annotate:
             table_name = table[1]
             index_to_append = tables_substring.find(table_name)
             temp_list = list(tables_substring)
-            temp_list.insert(index_to_append + len(table_name), f' (we used am ffkjsdlkjfslkdjfdffkjs dlkjfslkdjfdffkjsdlkjfslk jfdffkjsdlkjfslkdjfdffkjsdlkjfslk djfdffkjsdlkjfslkdjfdffkjsdlkjfslkdjf dffkjsdlkjfslkdjfdffkjsdlkjfslkdjfd  {scan_type})')
+            temp_list.insert(index_to_append + len(table_name),
+                             f' (we used am {scan_type})')
             tables_substring = ''.join(temp_list)
         tables_list = tables_substring.split(',')
         new_tables_string = tables_list[0]
@@ -109,7 +120,8 @@ class Annotate:
                     else sql_statement.find(substring2)
                 index_to_append += len(substring1)
                 temp_list = list(sql_statement)
-                temp_list.insert(index_to_append, f' (Join implemented using hash join operator because NL joins, merge join increase the estimated cost by at least 10, 7 times, respectively.)')
+                temp_list.insert(index_to_append,
+                                 f' (Join implemented using hash join operator because NL joins, merge join increase the estimated cost by at least 10, 7 times, respectively.)')
                 sql_statement = ''.join(temp_list)
         return format_sql_commands(sql_statement)
 
@@ -271,6 +283,38 @@ class Annotate:
     #      text += f"QEP uses Nested Loop on relation {node['Relation Name']} while AQP uses Hash Join on the relation {node2['Relation Name']} "
     #      text += "One of the operand has very few rows. Making nested loop more cost efficient compared to hash join."
 
+    def strip_table_name(self, cond):
+        """accepts 'nation.n_nationkey', converts to 'n_nationkey' for easier comparison"""
+        fixed = []
+        for key in cond:
+            if '.' in key:
+                key = key.split('.')[1]
+            fixed.append(key)
+        return fixed
+
+    def compare_join_infos_for_annot(self, qep_join, aqp_join_info, aqp_name):
+        # aqp_name is either 'AQP1' or 'AQP2'
+        differences_list = []
+        for aqp_join in aqp_join_info:
+            diff_join_type = qep_join[0] != aqp_join[0]  # Boolean to check if join conditions differ
+            # Need to check if the number of join conditions is the same
+            if len(qep_join) == len(aqp_join):  # Same number of join conditions
+                for i in range(1, len(qep_join) - 1):  # Loop through each join condition
+                    qep_cond = self.strip_table_name(qep_join[i])
+                    aqp_cond = self.strip_table_name(aqp_join[i])
+                    same_cond = qep_cond[0] in aqp_cond and qep_cond[1] in aqp_cond
+                    if not same_cond:
+                        break
+                else:
+                    if diff_join_type:
+                        if aqp_join[-1] > qep_join[-1]:
+                            cost_diff = round(100 - (qep_join[-1] / aqp_join[-1]) * 100, 3)
+                            # print("cost diff of " + aqp_name + ": " + str(qep_join[-1]) + " - " + str(aqp_join[-1]))
+                            cost_phrasing = f' the qep join reduced cost by {cost_diff}%'
+                            difference = qep_join[0] + ' was used in the QEP because, compared to ' + aqp_join[
+                                0] + f' in {aqp_name}, the qep join reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
+                            return difference
+
     def compare_join_infos(self, qep_join_info, aqp_join_info, aqp_name):
         # aqp_name is either 'AQP1' or 'AQP2'
         differences_list = []
@@ -303,5 +347,3 @@ class Annotate:
 sql_statement = "SELECT c_custkey,c_name,sum(l_extendedprice * (1 - l_discount)) as revenue,c_acctbal,n_name,c_address,c_phone,c_comment FROM customer,orders,lineitem,nation WHERE c_custkey = o_custkey AND l_orderkey = o_orderkey AND o_orderdate >= date '1993-10-01' AND o_orderdate < date '1993-10-01' + interval '3' month AND l_returnflag = 'R' AND c_nationkey = n_nationkey GROUP BY c_custkey,c_name,c_acctbal,c_phone,n_name,c_address,c_comment ORDER BY revenue desc LIMIT 20;"
 qep_node_dict, aqp1_node_dict, aqp2_node_dict = preprocessing.main(sql_statement)
 annotator = Annotate(qep_node_dict, aqp1_node_dict, aqp2_node_dict, sql_statement)
-
-

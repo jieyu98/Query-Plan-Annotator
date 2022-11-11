@@ -1,9 +1,9 @@
 from psycopg2 import connect
 
 # Specify DB credentials here
-DBNAME = "TPC-H"
-USER = "jy"
-PASSWORD = "password"
+DBNAME = "CZ4031Project"
+USER = "postgres"
+PASSWORD = "ashwin"
 PORT = "5432"
 HOST = "localhost"
 
@@ -159,6 +159,7 @@ def main(sql_statement):
     print(f"AQP1 Disabled: {disable_list}")
 
     # Get aqp1 and populate aqp1_node_dict
+    print('first disable list', disable_list)
     aqp1 = query_processor.get_aqp(sql_statement, disable_list)
     query_processor.get_nodes(aqp1, 0, aqp1_node_dict)
 
@@ -167,6 +168,7 @@ def main(sql_statement):
     print(f"AQP2 Disabled: {disable_list}")
 
     # Get aqp2 and populate aqp2_node_dict
+    print('second disable list', disable_list)
     aqp2 = query_processor.get_aqp(sql_statement, disable_list)
     query_processor.get_nodes(aqp2, 0, aqp2_node_dict)
 
