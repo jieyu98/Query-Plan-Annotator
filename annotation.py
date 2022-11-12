@@ -169,14 +169,16 @@ class Annotate:
                     return plan['Index Cond']
 
     @staticmethod
-    def strip_table_name(cond):
+    def strip_table_name(key):
         """accepts 'nation.n_nationkey', converts to 'n_nationkey' for easier comparison"""
-        fixed = []
-        for key in cond:
-            if '.' in key:
-                key = key.split('.')[1]
-            fixed.append(key)
-        return fixed
+        if '.' in key:
+            key = key.split('.')[1]
+        return key
+
+    def decompose_join_conds_list(self, join_conds):
+        """decomposes [[key_cond1, key_cond2], [key_cond3, key_cond4]]
+        into  [key_cond1, key_cond2, key_cond3, key_cond4] for easier comparison"""
+        return [self.strip_table_name(cond) for conds_pair in join_conds[1:-1] for cond in conds_pair]
 
     def compare_join_infos_for_annot(self, qep_join, aqp_join_info, aqp_name):
         # aqp_name is either 'AQP1' or 'AQP2'
@@ -184,18 +186,17 @@ class Annotate:
             diff_join_type = qep_join[0] != aqp_join[0]  # Boolean to check if join conditions differ
             # Need to check if the number of join conditions is the same
             if len(qep_join) == len(aqp_join):  # Same number of join conditions
-                for i in range(1, len(qep_join) - 1):  # Loop through each join condition
-                    qep_cond = self.strip_table_name(qep_join[i])
-                    aqp_cond = self.strip_table_name(aqp_join[i])
-                    same_cond = qep_cond[0] in aqp_cond and qep_cond[1] in aqp_cond
-                    if not same_cond:
+                list_qep_joins = self.decompose_join_conds_list(qep_join)
+                list_aqp_joins = self.decompose_join_conds_list(aqp_join)
+                for qep_key in list_qep_joins:  # Check that each qep_key in the conds is present in aqp conds
+                    if qep_key not in list_aqp_joins:
                         break
                 else:
                     if diff_join_type:
                         if aqp_join[-1] > qep_join[-1]:
                             cost_diff = round(100 - (qep_join[-1] / aqp_join[-1]) * 100, 3)
-                            difference = qep_join[0] + ' was used in the QEP because as compared to ' + aqp_join[
-                                0] + f' in {aqp_name}, the {qep_join[0]} reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
+                            difference = qep_join[0] + ' was used in the QEP because, compared to ' + aqp_join[
+                                0] + f' in {aqp_name}, the qep join reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
                             return difference, qep_join[1:-1]
         return None, None
 
