@@ -173,35 +173,35 @@ class Annotate:
         # Scans
         if type == 'Seq Scan':
             main_explaination = "Sequential scan is done because there is no index on the table data or when fetching " \
-                                "a few rows from a large table "
+                                "a few rows from a large table."
 
         if type == 'Index Scan':
             main_explaination = "Index Scan is done as there is an index on the tables, thus index scan having lower " \
-                                "cost as compared to Sequential Scan "
+                                "cost as compared to Sequential Scan."
 
         if type == 'Bitmap Scan':
             main_explaination = "Bitmap Scan is used as the middle ground between index scan and sequential scan, " \
                                 "where the number of records chosen may be too much for index scan but too little for" \
-                                " sequential scan "
+                                " sequential scan."
 
         if type == 'Index Only Scan':
             main_explaination = "Index scan will access data only through the index and not the table, reducing IO " \
                                 "cost, this is used because there is no need to access table data, only index data, " \
-                                "for the results "
+                                "for the results."
 
         if type == 'Subquery Scan':
-            main_explaination = "Subquery Scan will scan through the results from a child query"
+            main_explaination = "Subquery Scan will scan through the results from a child query."
 
         # Joins
         if type == 'Hash Join':
-            main_explaination = "Hash join is used as there is a hash table created in one of the tables. "
+            main_explaination = "Hash join is used as there is a hash table created in one of the tables."
 
         if type == 'Merge Join':
-            main_explaination = "Merge Join is used because the tables are sorted and uses minimal memory"
+            main_explaination = "Merge Join is used because the tables are sorted and uses minimal memory."
 
         if type == 'Nested Loop':
             main_explaination = "Nested loop join is used when the records to be looked for is small and the joined " \
-                                "columns of the inner row source are uniquely indexed. "
+                                "columns of the inner row source are uniquely indexed."
 
         return main_explaination
 
@@ -239,19 +239,19 @@ class Annotate:
     def get_node_diff_reasons(self, qep_node, aqp_node):
         text = ""
         if qep_node == "Index Scan" and aqp_node['Node Type'] == "Seq Scan":
-            text = "\tSequential Scan is used to scan over the entire table, which is less efficient as compared to Index Scan "
+            text = "\tSequential Scan is used to scan over the entire table, which is less efficient as compared to Index Scan."
 
         if qep_node == "Seq Scan" and aqp_node == "Index Scan":
-            text = "\tGiven the index scan's higher per row cost and the low selectivity of the scan predicate, sequential scan would be a better option to use compared to index scan due to lower cost"
+            text = "\tGiven the index scan's higher per row cost and the low selectivity of the scan predicate, sequential scan would be a better option to use compared to index scan due to lower cost."
 
         if qep_node== "Index Scan" and aqp_node == "Bitmap Scan":
-            text = "\tSince the scan predicate, {qep_node[Index Condition]}, has high selectivity, it is more preferrable to use Index Scan instead of Bitmap Scan"
+            text = "\tSince the scan predicate, {qep_node[Index Condition]}, has high selectivity, it is more preferrable to use Index Scan instead of Bitmap Scan."
 
         if qep_node == "Bitmap Scan" and aqp_node == "Index Scan":
-            text = "\tSince the scan predicate, {qep_node[Index Condition]}, has low selectivity,Bitmap scan is preferred to Index Scan"
+            text = "\tSince the scan predicate, {qep_node[Index Condition]}, has low selectivity,Bitmap scan is preferred to Index Scan."
 
         if qep_node == "Merge Join" and aqp_node == "Nested Loop":
-            text = "\tSince the relations to be joined are already sorted, Merge Join would be preferrable over Nested Loop"
+            text = "\tSince the relations to be joined are already sorted, Merge Join would be preferrable over Nested Loop."
 
         if qep_node == "Nested Loop" and aqp_node == "Merge Join":
             text = "\tSince the outer loop relation is relatively small and all tuples with the same join attribute values cannot fit into memory, nested loop will be more cost efficient than merge join."
