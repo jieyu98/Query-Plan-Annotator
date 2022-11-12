@@ -196,7 +196,7 @@ class Annotate:
                         if aqp_join[-1] > qep_join[-1]:
                             cost_diff = round(100 - (qep_join[-1] / aqp_join[-1]) * 100, 3)
                             difference = qep_join[0] + ' was used in the QEP because, compared to ' + aqp_join[
-                                0] + f' in {aqp_name}, the qep join reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
+                                0] + f' in {aqp_name}, the QEP join reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
                             return difference, qep_join[1:-1]
         return None, None
 
