@@ -55,25 +55,24 @@ class Annotate:
         # For each plan, print the plan name and its reasons
         for table in qep_scan_info:
             print(f"{table[0]} is performed on {table[1]}")
-            main_explanation, additional_info = self.get_annotation(table[0], table[1])
+            main_explanation = self.get_annotation(table[0])
             print("\t", main_explanation)
-            print("\t", additional_info)
+            print('\n')
 
     def annotate_joins(self, qep_join_info, aqp1_join_info, aqp2_join_info):
         for join in qep_join_info:
             print(f"{join[0]} is performed on conditions {join[1:-1]}")
-            main_explanation, additional_info = self.get_annotation(join[0], join[1:-1])
+            main_explanation = self.get_annotation(join[0])
             print("\t", main_explanation)
-            print("\t", additional_info)
             difference, conds = self.compare_join_infos_for_annot(join, aqp1_join_info, 'AQP1')
             difference2, conds2 = self.compare_join_infos_for_annot(join, aqp2_join_info, 'AQP2')
             if difference:
                 print("\t", difference)
-                node_differences1 = self.get_node_diff_reasons(join[0], aqp1_join_info[0][0], conds)
+                node_differences1 = self.get_node_diff_reasons(join[0], aqp1_join_info[0][0])
                 print("\t", node_differences1)
             if difference2:
                 print("\t", difference2)
-                node_differences2 = self.get_node_diff_reasons(join[0], aqp2_join_info[0][0], conds2)
+                node_differences2 = self.get_node_diff_reasons(join[0], aqp2_join_info[0][0])
                 print("\t", node_differences2)
             print('\n')
 
@@ -168,22 +167,17 @@ class Annotate:
                 if plan['Node Type'] == 'Index Scan' and 'Index Cond' in plan:
                     return plan['Index Cond']
 
-    def get_annotation(self, type, extra_info):
-        # extra info will be join conditions if we're passing in a join
-        # extra info will be a table name if we're passing in a scan
+    def get_annotation(self, type):
         main_explaination = "NIL"
-        additional_info = ""
 
         # Scans
         if type == 'Seq Scan':
             main_explaination = "Sequential scan is done because there is no index on the table data or when fetching " \
                                 "a few rows from a large table "
-            additional_info = f"Sequential Scan is performed on the relation: {extra_info}"
 
         if type == 'Index Scan':
             main_explaination = "Index Scan is done as there is an index on the tables, thus index scan having lower " \
                                 "cost as compared to Sequential Scan "
-            additional_info = f"Index Scan is done on the conditions {extra_info}"
 
         if type == 'Bitmap Scan':
             main_explaination = "Bitmap Scan is used as the middle ground between index scan and sequential scan, " \
@@ -194,7 +188,6 @@ class Annotate:
             main_explaination = "Index scan will access data only through the index and not the table, reducing IO " \
                                 "cost, this is used because there is no need to access table data, only index data, " \
                                 "for the results "
-            additional_info = f"Index scan involved {extra_info} rows"
 
         if type == 'Subquery Scan':
             main_explaination = "Subquery Scan will scan through the results from a child query"
@@ -202,17 +195,15 @@ class Annotate:
         # Joins
         if type == 'Hash Join':
             main_explaination = "Hash join is used as there is a hash table created in one of the tables. "
-            additional_info = f"Hash Join is used on the condition {extra_info}"
 
         if type == 'Merge Join':
             main_explaination = "Merge Join is used because the tables are sorted and uses minimal memory"
-            additional_info = f"Merge join is used on the condition {extra_info}"
 
         if type == 'Nested Loop':
             main_explaination = "Nested loop join is used when the records to be looked for is small and the joined " \
                                 "columns of the inner row source are uniquely indexed. "
 
-        return main_explaination, additional_info
+        return main_explaination
 
     @staticmethod
     def strip_table_name(cond):
@@ -240,60 +231,41 @@ class Annotate:
                     if diff_join_type:
                         if aqp_join[-1] > qep_join[-1]:
                             cost_diff = round(100 - (qep_join[-1] / aqp_join[-1]) * 100, 3)
-                            difference = qep_join[0] + ' was used in the QEP because, compared to ' + aqp_join[
-                                0] + f' in {aqp_name}, the qep join reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
+                            difference = qep_join[0] + ' was used in the QEP because as compared to ' + aqp_join[
+                                0] + f' in {aqp_name}, the {qep_join[0]} reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
                             return difference, qep_join[1:-1]
         return None, None
 
-    def get_node_diff_reasons(self, qep_node, aqp_node, extra_info):
+    def get_node_diff_reasons(self, qep_node, aqp_node):
         text = ""
         if qep_node == "Index Scan" and aqp_node['Node Type'] == "Seq Scan":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Index Scan on relation {extra_info} while AQP uses Sequential Scan on relation {extra_info} "
-            text += "\n\tSequential Scan is used to scan over the entire table, which is less efficient as compared to Index Scan "
+            text = "\tSequential Scan is used to scan over the entire table, which is less efficient as compared to Index Scan "
 
         if qep_node == "Seq Scan" and aqp_node == "Index Scan":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Sequential Scan on relation {extra_info} while AQP uses Index Scan on relation {extra_info} "
-            text += "\n\tGiven the index scan's higher per row cost and the low selectivity of the scan predicate, sequential scan would be a better option to use compared to index scan due to lower cost"
+            text = "\tGiven the index scan's higher per row cost and the low selectivity of the scan predicate, sequential scan would be a better option to use compared to index scan due to lower cost"
 
         if qep_node== "Index Scan" and aqp_node == "Bitmap Scan":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Index Scan on relation {extra_info} while AQP uses Bitmap Scan on relation {extra_info} "
-            text += "\n\tSince the scan predicate, {qep_node[Index Condition]}, has high selectivity, it is more preferrable to use Index Scan instead of Bitmap Scan"
+            text = "\tSince the scan predicate, {qep_node[Index Condition]}, has high selectivity, it is more preferrable to use Index Scan instead of Bitmap Scan"
 
         if qep_node == "Bitmap Scan" and aqp_node == "Index Scan":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Bitmap Scan on relation {extra_info} while AQP uses Index Scan on relation {extra_info} "
-            text += "\n\tSince the scan predicate, {qep_node[Index Condition]}, has low selectivity,Bitmap scan is preferred to Index Scan"
+            text = "\tSince the scan predicate, {qep_node[Index Condition]}, has low selectivity,Bitmap scan is preferred to Index Scan"
 
         if qep_node == "Merge Join" and aqp_node == "Nested Loop":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Nested Loop on relation {extra_info} while AQP uses Merge Join on the relation {extra_info} "
-            text += "\n\tSince the relations to be joined are already sorted, Merge Join would be preferrable over Nested Loop"
+            text = "\tSince the relations to be joined are already sorted, Merge Join would be preferrable over Nested Loop"
 
         if qep_node == "Nested Loop" and aqp_node == "Merge Join":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Merge Join on relation {extra_info} while AQP uses Nested Loop on the relation {extra_info} "
-            text += "\n\tSince the outer loop relation is relatively small and all tuples with the same join attribute values cannot fit into memory, nested loop will be more cost efficient than merge join."
+            text = "\tSince the outer loop relation is relatively small and all tuples with the same join attribute values cannot fit into memory, nested loop will be more cost efficient than merge join."
 
         if qep_node == "Merge Join" and aqp_node == "Hash Join":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Merge Join on relation {extra_info} while AQP uses Hash Join on the relation {extra_info} "
-            text += "\n\tGiven that the hash table does not fit into the memory, hash join becomes slower and less preferrable compared to merge join."
+            text = "\tGiven that the hash table does not fit into the memory, hash join becomes slower and less preferrable compared to merge join."
 
         if qep_node == "Hash Join" and aqp_node == "Merge Join":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Hash Join on relation {extra_info} while AQP uses Merge Join on the relation {extra_info} "
-            text += "\n\tHash table can fit into memory, thus reducing the hash join cost, making it more preferrable than the merge join."
+            text = "\tHash table can fit into memory, thus reducing the hash join cost, making it more preferrable than the merge join."
 
         if qep_node == "Hash Join" and aqp_node == "Nested Loop":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Hash Join on relation {extra_info} while AQP uses Nested Loop on the relation {extra_info} "
-            text += "\n\tHash table can fit into memory, reducing cost of hash join, thus making it better compared to nested loop."
+            text = "\tHash table can fit into memory, reducing cost of hash join, thus making it better compared to nested loop."
 
         if qep_node == "Nested Loop" and aqp_node == "Hash Join":
-            text = f"Difference Reasoning: "
-            text += f"\n\tQEP uses Nested Loop on relation {extra_info} while AQP uses Hash Join on the relation {extra_info} "
-            text += "\n\tOne of the operand has very few rows. Making nested loop more cost efficient compared to hash join."
-        return text + '\n'
+            text = "\tOne of the operand has very few rows. Making nested loop more cost efficient compared to hash join."
+
+        return text
