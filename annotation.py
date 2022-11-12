@@ -1,6 +1,4 @@
 import pandas as pd
-from sql_formatter.format_file import format_sql_commands
-import pandas as pd
 import altair as alt
 
 
@@ -18,6 +16,7 @@ class Annotate:
         # Extract scan info from qep node dict
         self.qep_scan_info = self.extract_scan_info(qep_node_dict)
 
+    # Create time chart for data visualization (Compares actual total time)
     def create_time_chart(self):
         source = pd.DataFrame({
             'Actual Total Time (ns)': [self.aqp2_node_dict[0][0]['Actual Total Time'],
@@ -35,6 +34,7 @@ class Annotate:
 
         return bar_chart
 
+    # Create cost chart for data visualization (Compares total cost)
     def create_cost_chart(self):
         source = pd.DataFrame({
             'Total Cost': [self.aqp2_node_dict[0][0]['Total Cost'], self.aqp1_node_dict[0][0]['Total Cost'],
@@ -51,6 +51,7 @@ class Annotate:
 
         return bar_chart
 
+    #
     def annotate_tables(self, qep_scan_info):
         # For each plan, print the plan name and its reasons
         for table in qep_scan_info:
@@ -167,6 +168,37 @@ class Annotate:
                 if plan['Node Type'] == 'Index Scan' and 'Index Cond' in plan:
                     return plan['Index Cond']
 
+    @staticmethod
+    def strip_table_name(cond):
+        """accepts 'nation.n_nationkey', converts to 'n_nationkey' for easier comparison"""
+        fixed = []
+        for key in cond:
+            if '.' in key:
+                key = key.split('.')[1]
+            fixed.append(key)
+        return fixed
+
+    def compare_join_infos_for_annot(self, qep_join, aqp_join_info, aqp_name):
+        # aqp_name is either 'AQP1' or 'AQP2'
+        for aqp_join in aqp_join_info:
+            diff_join_type = qep_join[0] != aqp_join[0]  # Boolean to check if join conditions differ
+            # Need to check if the number of join conditions is the same
+            if len(qep_join) == len(aqp_join):  # Same number of join conditions
+                for i in range(1, len(qep_join) - 1):  # Loop through each join condition
+                    qep_cond = self.strip_table_name(qep_join[i])
+                    aqp_cond = self.strip_table_name(aqp_join[i])
+                    same_cond = qep_cond[0] in aqp_cond and qep_cond[1] in aqp_cond
+                    if not same_cond:
+                        break
+                else:
+                    if diff_join_type:
+                        if aqp_join[-1] > qep_join[-1]:
+                            cost_diff = round(100 - (qep_join[-1] / aqp_join[-1]) * 100, 3)
+                            difference = qep_join[0] + ' was used in the QEP because as compared to ' + aqp_join[
+                                0] + f' in {aqp_name}, the {qep_join[0]} reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
+                            return difference, qep_join[1:-1]
+        return None, None
+
     def get_annotation(self, type):
         main_explaination = "NIL"
 
@@ -205,41 +237,11 @@ class Annotate:
 
         return main_explaination
 
-    @staticmethod
-    def strip_table_name(cond):
-        """accepts 'nation.n_nationkey', converts to 'n_nationkey' for easier comparison"""
-        fixed = []
-        for key in cond:
-            if '.' in key:
-                key = key.split('.')[1]
-            fixed.append(key)
-        return fixed
-
-    def compare_join_infos_for_annot(self, qep_join, aqp_join_info, aqp_name):
-        # aqp_name is either 'AQP1' or 'AQP2'
-        for aqp_join in aqp_join_info:
-            diff_join_type = qep_join[0] != aqp_join[0]  # Boolean to check if join conditions differ
-            # Need to check if the number of join conditions is the same
-            if len(qep_join) == len(aqp_join):  # Same number of join conditions
-                for i in range(1, len(qep_join) - 1):  # Loop through each join condition
-                    qep_cond = self.strip_table_name(qep_join[i])
-                    aqp_cond = self.strip_table_name(aqp_join[i])
-                    same_cond = qep_cond[0] in aqp_cond and qep_cond[1] in aqp_cond
-                    if not same_cond:
-                        break
-                else:
-                    if diff_join_type:
-                        if aqp_join[-1] > qep_join[-1]:
-                            cost_diff = round(100 - (qep_join[-1] / aqp_join[-1]) * 100, 3)
-                            difference = qep_join[0] + ' was used in the QEP because as compared to ' + aqp_join[
-                                0] + f' in {aqp_name}, the {qep_join[0]} reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
-                            return difference, qep_join[1:-1]
-        return None, None
-
     def get_node_diff_reasons(self, qep_node, aqp_node):
         text = ""
+
         if qep_node == "Index Scan" and aqp_node['Node Type'] == "Seq Scan":
-            text = "\tSequential Scan is used to scan over the entire table, which is less efficient as compared to Index Scan."
+            text = "\tIndex Scan is more efficient because Sequential Scan will scan over the entire table."
 
         if qep_node == "Seq Scan" and aqp_node == "Index Scan":
             text = "\tGiven the index scan's higher per row cost and the low selectivity of the scan predicate, sequential scan would be a better option to use compared to index scan due to lower cost."
@@ -251,7 +253,7 @@ class Annotate:
             text = "\tSince the scan predicate, {qep_node[Index Condition]}, has low selectivity,Bitmap scan is preferred to Index Scan."
 
         if qep_node == "Merge Join" and aqp_node == "Nested Loop":
-            text = "\tSince the relations to be joined are already sorted, Merge Join would be preferrable over Nested Loop."
+            text = "\tSince the relations to be joined are already sorted, Merge Join would be preferable over Nested Loop."
 
         if qep_node == "Nested Loop" and aqp_node == "Merge Join":
             text = "\tSince the outer loop relation is relatively small and all tuples with the same join attribute values cannot fit into memory, nested loop will be more cost efficient than merge join."
@@ -269,3 +271,4 @@ class Annotate:
             text = "\tOne of the operand has very few rows. Making nested loop more cost efficient compared to hash join."
 
         return text
+
