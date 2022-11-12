@@ -196,7 +196,7 @@ class Annotate:
                         if aqp_join[-1] > qep_join[-1]:
                             cost_diff = round(100 - (qep_join[-1] / aqp_join[-1]) * 100, 3)
                             difference = qep_join[0] + ' was used in the QEP because, compared to ' + aqp_join[
-                                0] + f' in {aqp_name}, the QEP join reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
+                                0] + f' in {aqp_name}, the {qep_join[0]} reduced cost by {cost_diff}% (from {aqp_join[-1]} to {qep_join[-1]})'
                             return difference, qep_join[1:-1]
         return None, None
 
@@ -248,7 +248,7 @@ class Annotate:
             text = "\tGiven the index scan's higher per row cost and the low selectivity of the scan predicate, sequential scan would be a better option to use compared to index scan due to lower cost."
 
         if qep_node== "Index Scan" and aqp_node == "Bitmap Scan":
-            text = "\tSince the scan predicate, {qep_node[Index Condition]}, has high selectivity, it is more preferrable to use Index Scan instead of Bitmap Scan."
+            text = "\tSince the scan predicate, {qep_node[Index Condition]}, has high selectivity, it is more preferable to use Index Scan instead of Bitmap Scan."
 
         if qep_node == "Bitmap Scan" and aqp_node == "Index Scan":
             text = "\tSince the scan predicate, {qep_node[Index Condition]}, has low selectivity,Bitmap scan is preferred to Index Scan."
@@ -260,10 +260,10 @@ class Annotate:
             text = "\tSince the outer loop relation is relatively small and all tuples with the same join attribute values cannot fit into memory, nested loop will be more cost efficient than merge join."
 
         if qep_node == "Merge Join" and aqp_node == "Hash Join":
-            text = "\tGiven that the hash table does not fit into the memory, hash join becomes slower and less preferrable compared to merge join."
+            text = "\tGiven that the hash table does not fit into the memory, hash join becomes slower and less preferable compared to merge join."
 
         if qep_node == "Hash Join" and aqp_node == "Merge Join":
-            text = "\tHash table can fit into memory, thus reducing the hash join cost, making it more preferrable than the merge join."
+            text = "\tHash table can fit into memory, thus reducing the hash join cost, making it more preferable than the merge join."
 
         if qep_node == "Hash Join" and aqp_node == "Nested Loop":
             text = "\tHash table can fit into memory, reducing cost of hash join, thus making it better compared to nested loop."
